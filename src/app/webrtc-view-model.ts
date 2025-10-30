@@ -17,7 +17,16 @@ export class WebrtcViewModel extends EventTarget {
 	async init() {
 		this.ws = new WebSocket(this.serverUrl);
 
-		this.peerConnection = new RTCPeerConnection();
+		this.peerConnection = new RTCPeerConnection({
+			iceServers: [
+				{ urls: 'stun:stun.l.google.com:19302' },
+				{
+					urls: 'turn:relay1.expressturn.com:3478',
+					username: 'efProject',
+					credential: 'efProject',
+				},
+			],
+		});
 
 		this.peerConnection.ontrack = (e) => {
 			const stream = e.streams[0];
