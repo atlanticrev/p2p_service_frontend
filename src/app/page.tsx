@@ -12,9 +12,9 @@ export default function Page() {
 
 	const [status, setStatus] = useState('disconnected');
 
-	const localVideo = useRef<HTMLVideoElement>(null);
+	const localVideoRef = useRef<HTMLVideoElement>(null);
 
-	const remoteVideo = useRef<HTMLVideoElement>(null);
+	const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
 	useEffect(() => {
 		viewModel.init();
@@ -22,16 +22,18 @@ export default function Page() {
 		const onLocalStream = (e: Event) => {
 			const stream = (e as CustomEvent<MediaStream>).detail;
 
-			if (localVideo.current) {
-				localVideo.current.srcObject = stream;
+			if (localVideoRef.current) {
+				localVideoRef.current.srcObject = stream;
+				localVideoRef.current.play().catch((error) => console.warn(error, 'Local video play failed'));
 			}
 		};
 
 		const onRemoteStream = (e: Event) => {
 			const stream = (e as CustomEvent<MediaStream>).detail;
 
-			if (remoteVideo.current) {
-				remoteVideo.current.srcObject = stream;
+			if (remoteVideoRef.current) {
+				remoteVideoRef.current.srcObject = stream;
+				remoteVideoRef.current.play().catch((error) => console.warn(error, 'Remote video play failed'));
 			}
 		};
 
@@ -65,10 +67,10 @@ export default function Page() {
 			<h2>WebRTC Video Call</h2>
 
 			<div className={styles.videoWrapper}>
-				<video ref={localVideo} autoPlay muted playsInline className={styles.video} />
+				<video ref={localVideoRef} autoPlay playsInline muted className={styles.video} />
 
 				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
-				<video ref={remoteVideo} autoPlay playsInline className={styles.video} />
+				<video ref={remoteVideoRef} autoPlay playsInline className={styles.video} />
 			</div>
 
 			<button type="button" onClick={() => viewModel.startCall()} className={styles.button}>
