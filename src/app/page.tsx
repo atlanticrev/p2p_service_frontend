@@ -24,6 +24,7 @@ export default function Page() {
 
 			if (localVideoRef.current) {
 				localVideoRef.current.srcObject = stream;
+
 				localVideoRef.current.play().catch((error) => console.warn(error, 'Local video play failed'));
 			}
 		};
@@ -33,6 +34,7 @@ export default function Page() {
 
 			if (remoteVideoRef.current) {
 				remoteVideoRef.current.srcObject = stream;
+
 				remoteVideoRef.current.play().catch((error) => console.warn(error, 'Remote video play failed'));
 			}
 		};
