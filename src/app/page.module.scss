@@ -7,12 +7,18 @@
   background: #0f172a;
   color: white;
   gap: 1rem;
+  padding: 1rem;
 }
 
 .videoWrapper {
   display: flex;
+  flex-flow: row nowrap;
   gap: 1rem;
   margin: 1rem 0;
+
+  @media (max-width: 768px) {
+    flex-flow: column nowrap;
+  }
 }
 
 .video {
