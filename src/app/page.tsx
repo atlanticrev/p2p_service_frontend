@@ -1,66 +1,81 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+import { useEffect, useRef, useState } from 'react';
+
+import styles from './page.module.scss';
+import { WebrtcViewModel } from './webrtc-view-model';
+
+const SERVER_URL = 'https://p2p-service-backend.onrender.com';
+
+export default function Page() {
+	const [viewModel] = useState(() => new WebrtcViewModel(SERVER_URL));
+
+	const [status, setStatus] = useState('disconnected');
+
+	const localVideo = useRef<HTMLVideoElement>(null);
+
+	const remoteVideo = useRef<HTMLVideoElement>(null);
+
+	useEffect(() => {
+		viewModel.init();
+
+		const onLocalStream = (e: Event) => {
+			const stream = (e as CustomEvent<MediaStream>).detail;
+
+			if (localVideo.current) {
+				localVideo.current.srcObject = stream;
+			}
+		};
+
+		const onRemoteStream = (e: Event) => {
+			const stream = (e as CustomEvent<MediaStream>).detail;
+
+			if (remoteVideo.current) {
+				remoteVideo.current.srcObject = stream;
+			}
+		};
+
+		const onState = (e: Event) => {
+			const state = (e as CustomEvent<string>).detail;
+
+			setStatus(state);
+		};
+
+		const onError = (e: Event) => {
+			console.error('WebRTC error:', (e as CustomEvent).detail);
+		};
+
+		viewModel.addEventListener('localStream', onLocalStream);
+		viewModel.addEventListener('remoteStream', onRemoteStream);
+		viewModel.addEventListener('connectionState', onState);
+		viewModel.addEventListener('error', onError);
+
+		return () => {
+			viewModel.removeEventListener('localStream', onLocalStream);
+			viewModel.removeEventListener('remoteStream', onRemoteStream);
+			viewModel.removeEventListener('connectionState', onState);
+			viewModel.removeEventListener('error', onError);
+
+			viewModel.destroy();
+		};
+	}, [viewModel]);
+
+	return (
+		<main className={styles.container}>
+			<h2>WebRTC Video Call</h2>
+
+			<div className={styles.videoWrapper}>
+				<video ref={localVideo} autoPlay muted playsInline className={styles.video} />
+
+				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
+				<video ref={remoteVideo} autoPlay playsInline className={styles.video} />
+			</div>
+
+			<button type="button" onClick={() => viewModel.startCall()} className={styles.button}>
+				Start Call
+			</button>
+
+			<p className={styles.status}>Status: {status}</p>
+		</main>
+	);
 }

@@ -1,0 +1,200 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.2/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 4,
+		"lineEnding": "lf",
+		"lineWidth": 120,
+		"attributePosition": "auto",
+		"bracketSameLine": false,
+		"bracketSpacing": true,
+		"expand": "auto",
+		"useEditorconfig": true
+	},
+	"linter": {
+		"enabled": true,
+		"domains": {
+			"react": "all"
+		},
+		"rules": {
+			"recommended": true,
+			"correctness": {
+				"noInvalidUseBeforeDeclaration": "error",
+				"noUnusedVariables": {
+					"fix": "none",
+					"level": "error",
+					"options": {
+						"ignoreRestSiblings": false
+					}
+				},
+				"noUnusedImports": {
+					"fix": "none",
+					"level": "error",
+					"options": {}
+				},
+				"noUnusedFunctionParameters": "error",
+				"useHookAtTopLevel": "error",
+				"useExhaustiveDependencies": {
+					"level": "warn",
+					"options": {
+						"hooks": [
+							{
+								"name": "useAppDispatch",
+								"stableResult": true
+							}
+						]
+					}
+				},
+				"useUniqueElementIds": {
+					"level": "error",
+					"options": {
+						"excludedComponents": ["a"]
+					}
+				}
+			},
+			"complexity": {
+				"noVoid": "off"
+			},
+			"style": {
+				"useConst": "error",
+				"useImportType": "error",
+				"noParameterAssign": "error",
+				"useNamingConvention": {
+					"options": {
+						"strictCase": true,
+						"requireAscii": true,
+						"conventions": [
+							{
+								"selector": {
+									"kind": "enum",
+									"scope": "any"
+								},
+								"formats": ["CONSTANT_CASE"]
+							},
+							{
+								"selector": {
+									"kind": "enumMember",
+									"scope": "any"
+								},
+								"formats": ["CONSTANT_CASE"]
+							},
+							{
+								"selector": {
+									"kind": "variable",
+									"scope": "any"
+								},
+								"formats": ["CONSTANT_CASE", "PascalCase", "camelCase"]
+							},
+							{
+								"selector": {
+									"kind": "objectLiteralProperty",
+									"scope": "any"
+								},
+								"formats": ["CONSTANT_CASE", "camelCase"]
+							},
+							{
+								"selector": {
+									"kind": "typeProperty",
+									"scope": "any"
+								},
+								"formats": ["CONSTANT_CASE", "PascalCase", "camelCase"]
+							},
+							{
+								"selector": {
+									"kind": "typeAlias",
+									"scope": "any"
+								},
+								"formats": ["PascalCase"],
+								"match": "[T](.*)"
+							},
+							{
+								"selector": {
+									"kind": "interface",
+									"scope": "any"
+								},
+								"formats": ["PascalCase"],
+								"match": "[I](.*)"
+							}
+						]
+					},
+					"level": "error"
+				},
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": {
+						"strictCase": true,
+						"requireAscii": true,
+						"filenameCases": ["kebab-case"]
+					}
+				}
+			},
+			"suspicious": {
+				"noConsole": "warn",
+				"noExplicitAny": "error",
+				"noArrayIndexKey": "error"
+			}
+		},
+		"includes": ["src/**/*.{js,jsx,ts,tsx,css}", "vite.config.ts", "!export/*", "!node_modules/*"]
+	},
+	"javascript": {
+		"formatter": {
+			"jsxQuoteStyle": "double",
+			"quoteProperties": "asNeeded",
+			"trailingCommas": "all",
+			"semicolons": "always",
+			"arrowParentheses": "always",
+			"bracketSameLine": false,
+			"quoteStyle": "single",
+			"attributePosition": "auto",
+			"bracketSpacing": true
+		}
+	},
+	"html": {
+		"formatter": {
+			"selfCloseVoidElements": "always"
+		}
+	},
+	"css": {
+		"parser": {
+			"cssModules": true
+		},
+		"formatter": {
+			"enabled": true
+		},
+		"linter": {
+			"enabled": true
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"useSortedProperties": "on",
+				"organizeImports": {
+					"level": "on",
+					"options": {
+						"groups": [
+							[":BUN:", ":NODE:"],
+							":BLANK_LINE:",
+							["react", "preact", "preact-*"],
+							[":PACKAGE:", "!@/**"],
+							":BLANK_LINE:",
+							["@/**"],
+							":BLANK_LINE:",
+							"../**",
+							":BLANK_LINE:",
+							"./**"
+						]
+					}
+				}
+			}
+		}
+	}
+}
