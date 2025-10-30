@@ -19,13 +19,31 @@ export class WebrtcViewModel extends EventTarget {
 
 		this.peerConnection = new RTCPeerConnection({
 			iceServers: [
-				{ urls: 'stun:stun.l.google.com:19302' },
 				{
-					urls: 'turn:relay1.expressturn.com:3478',
-					username: 'efProject',
-					credential: 'efProject',
+					urls: ['stun:fr-turn7.xirsys.com'],
+				},
+				{
+					username:
+						'v0-6vfl1Kv77LK3VB-Aq9uV40EDgeae7H5TEgvqhCQVwT_F5Ts2UKgGYLtDVEFKYAAAAAGkDxNRhdGxhbnRpY3Jldg==',
+					credential: 'a9134daa-b5cb-11f0-b107-5e2012a06e7d',
+					urls: [
+						'turn:fr-turn7.xirsys.com:80?transport=udp',
+						'turn:fr-turn7.xirsys.com:3478?transport=udp',
+						'turn:fr-turn7.xirsys.com:80?transport=tcp',
+						'turn:fr-turn7.xirsys.com:3478?transport=tcp',
+						'turns:fr-turn7.xirsys.com:443?transport=tcp',
+						'turns:fr-turn7.xirsys.com:5349?transport=tcp',
+					],
 				},
 			],
+			// iceServers: [
+			// 	{ urls: 'stun:stun.l.google.com:19302' },
+			// 	{
+			// 		urls: 'turn:relay1.expressturn.com:3478',
+			// 		username: 'efProject',
+			// 		credential: 'efProject',
+			// 	},
+			// ],
 		});
 
 		this.peerConnection.ontrack = (e) => {
