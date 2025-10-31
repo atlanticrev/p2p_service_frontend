@@ -1,6 +1,25 @@
 // biome-ignore lint/style/useNamingConvention: <->
 export type TWebRTCEvent = 'localStream' | 'remoteStream' | 'connectionState' | 'error';
 
+const STUN_SERVERS_CONFIG = {
+	urls: ['stun:fr-turn7.xirsys.com'],
+};
+
+const TURN_SERVERS_CONFIG = {
+	username: process.env.NEXT_PUBLIC_TURN_SERVER_USERNAME,
+	credential: process.env.NEXT_PUBLIC_TURN_SERVER_CREDENTIAL,
+	urls: [
+		'turn:fr-turn7.xirsys.com:80?transport=udp',
+		'turn:fr-turn7.xirsys.com:3478?transport=udp',
+		'turn:fr-turn7.xirsys.com:80?transport=tcp',
+		'turn:fr-turn7.xirsys.com:3478?transport=tcp',
+		'turns:fr-turn7.xirsys.com:443?transport=tcp',
+		'turns:fr-turn7.xirsys.com:5349?transport=tcp',
+	],
+};
+
+const USE_TURN_SERVERS = false;
+
 export class WebrtcViewModel extends EventTarget {
 	private ws: WebSocket | null = null;
 
@@ -18,24 +37,7 @@ export class WebrtcViewModel extends EventTarget {
 		this.ws = new WebSocket(this.serverUrl);
 
 		this.peerConnection = new RTCPeerConnection({
-			iceServers: [
-				{
-					urls: ['stun:fr-turn7.xirsys.com'],
-				},
-				{
-					username:
-						'v0-6vfl1Kv77LK3VB-Aq9uV40EDgeae7H5TEgvqhCQVwT_F5Ts2UKgGYLtDVEFKYAAAAAGkDxNRhdGxhbnRpY3Jldg==',
-					credential: 'a9134daa-b5cb-11f0-b107-5e2012a06e7d',
-					urls: [
-						'turn:fr-turn7.xirsys.com:80?transport=udp',
-						'turn:fr-turn7.xirsys.com:3478?transport=udp',
-						'turn:fr-turn7.xirsys.com:80?transport=tcp',
-						'turn:fr-turn7.xirsys.com:3478?transport=tcp',
-						'turns:fr-turn7.xirsys.com:443?transport=tcp',
-						'turns:fr-turn7.xirsys.com:5349?transport=tcp',
-					],
-				},
-			],
+			iceServers: [STUN_SERVERS_CONFIG, ...(USE_TURN_SERVERS ? [TURN_SERVERS_CONFIG] : [])],
 		});
 
 		this.peerConnection.ontrack = (e) => {
@@ -82,7 +84,21 @@ export class WebrtcViewModel extends EventTarget {
 			}
 		};
 
-		this.peerConnection.onconnectionstatechange = () => {
+		this.peerConnection.onconnectionstatechange = async () => {
+			const stats = await this.peerConnection?.getStats();
+
+			stats?.forEach((report) => {
+				if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+					const local = stats.get(report.localCandidateId);
+
+					const remote = stats.get(report.remoteCandidateId);
+
+					// candidateType might be - 'host', 'srflx', 'prflx', 'relay'
+					console.log('local.candidateType ->', local.candidateType);
+					console.log('remote.candidateType ->', remote.candidateType);
+				}
+			});
+
 			this.dispatchEvent(new CustomEvent('connectionState', { detail: this.peerConnection?.connectionState }));
 		};
 	}
@@ -102,14 +118,16 @@ export class WebrtcViewModel extends EventTarget {
 	}
 
 	private async createLocalStream(): Promise<MediaStream> {
-		const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+		const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+		console.log('localStream.audioTracks ->', localStream.getAudioTracks());
 
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-		stream.getTracks().forEach((t) => this.peerConnection?.addTrack(t, stream));
+		localStream.getTracks().forEach((t) => this.peerConnection?.addTrack(t, localStream));
 
-		this.dispatchEvent(new CustomEvent('localStream', { detail: stream }));
+		this.dispatchEvent(new CustomEvent('localStream', { detail: localStream }));
 
-		return stream;
+		return localStream;
 	}
 
 	destroy() {
