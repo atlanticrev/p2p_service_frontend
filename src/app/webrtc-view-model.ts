@@ -33,6 +33,34 @@ export class WebrtcViewModel extends EventTarget {
 		this.serverUrl = serverUrl;
 	}
 
+	logAudioStats(peerConnection: RTCPeerConnection) {
+		setInterval(async () => {
+			const stats = await peerConnection.getStats();
+
+			const audio = { inbound: {}, outbound: {} };
+
+			stats.forEach((report) => {
+				if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+					audio.inbound = {
+						packetsReceived: report.packetsReceived,
+						bytesReceived: report.bytesReceived,
+						jitter: report.jitter,
+					};
+				}
+
+				if (report.type === 'outbound-rtp' && report.kind === 'audio') {
+					audio.outbound = {
+						packetsSent: report.packetsSent,
+						bytesSent: report.bytesSent,
+					};
+				}
+			});
+
+			console.log('Audio info:');
+			console.table(audio);
+		}, 2_000);
+	}
+
 	async init() {
 		this.ws = new WebSocket(this.serverUrl);
 
@@ -85,6 +113,12 @@ export class WebrtcViewModel extends EventTarget {
 		};
 
 		this.peerConnection.onconnectionstatechange = async () => {
+			if (this.peerConnection?.connectionState === 'connected') {
+				console.log('✅ Peers connected — start logging audio stats...');
+
+				this.logAudioStats(this.peerConnection);
+			}
+
 			const stats = await this.peerConnection?.getStats();
 
 			stats?.forEach((report) => {
@@ -94,8 +128,7 @@ export class WebrtcViewModel extends EventTarget {
 					const remote = stats.get(report.remoteCandidateId);
 
 					// candidateType might be - 'host', 'srflx', 'prflx', 'relay'
-					console.log('local.candidateType ->', local.candidateType);
-					console.log('remote.candidateType ->', remote.candidateType);
+					console.log('✅ Connected via:', local.candidateType, '/', remote.candidateType);
 				}
 			});
 

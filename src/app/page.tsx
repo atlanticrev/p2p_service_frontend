@@ -69,7 +69,8 @@ export default function Page() {
 			<h2>WebRTC Video Call</h2>
 
 			<div className={styles.videoWrapper}>
-				<video ref={localVideoRef} autoPlay playsInline muted className={styles.video} />
+				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
+				<video ref={localVideoRef} autoPlay playsInline className={styles.video} />
 
 				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
 				<video ref={remoteVideoRef} autoPlay playsInline className={styles.video} />
