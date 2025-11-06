@@ -57,6 +57,7 @@ export class WebrtcViewModel extends EventTarget {
 			});
 
 			console.log('Audio info:');
+
 			console.table(audio);
 		}, 2_000);
 	}
@@ -64,23 +65,7 @@ export class WebrtcViewModel extends EventTarget {
 	async init() {
 		this.ws = new WebSocket(this.serverUrl);
 
-		this.peerConnection = new RTCPeerConnection({
-			iceServers: [STUN_SERVERS_CONFIG, ...(USE_TURN_SERVERS ? [TURN_SERVERS_CONFIG] : [])],
-		});
-
-		this.peerConnection.ontrack = (e) => {
-			const stream = e.streams[0];
-
-			this.dispatchEvent(new CustomEvent('remoteStream', { detail: stream }));
-		};
-
-		this.peerConnection.onicecandidate = (e) => {
-			if (e.candidate) {
-				this.ws?.send(JSON.stringify({ type: 'candidate', candidate: e.candidate }));
-			}
-		};
-
-		this.ws.onmessage = async (event) => {
+		this.ws?.addEventListener('message', async (event) => {
 			const data = JSON.parse(event.data);
 
 			if (!this.peerConnection) {
@@ -89,12 +74,11 @@ export class WebrtcViewModel extends EventTarget {
 
 			try {
 				if (data.type === 'offer') {
-					await this.peerConnection.setRemoteDescription(data.offer);
-
 					await this.createLocalStream();
 
-					const answer = await this.peerConnection.createAnswer();
+					await this.peerConnection.setRemoteDescription(data.offer);
 
+					const answer = await this.peerConnection.createAnswer();
 					await this.peerConnection.setLocalDescription(answer);
 
 					this.ws?.send(JSON.stringify({ type: 'answer', answer }));
@@ -110,7 +94,25 @@ export class WebrtcViewModel extends EventTarget {
 			} catch (err) {
 				this.dispatchEvent(new CustomEvent('error', { detail: err }));
 			}
-		};
+		});
+
+		this.peerConnection = new RTCPeerConnection({
+			iceServers: [STUN_SERVERS_CONFIG, ...(USE_TURN_SERVERS ? [TURN_SERVERS_CONFIG] : [])],
+		});
+
+		this.peerConnection.addEventListener('track', (event) => {
+			console.log('Incoming track:', event.track.kind, event.streams);
+
+			const stream = event.streams[0];
+
+			this.dispatchEvent(new CustomEvent('remoteStream', { detail: stream }));
+		});
+
+		this.peerConnection.addEventListener('icecandidate', (event) => {
+			if (event.candidate) {
+				this.ws?.send(JSON.stringify({ type: 'candidate', candidate: event.candidate }));
+			}
+		});
 
 		this.peerConnection.onconnectionstatechange = async () => {
 			if (this.peerConnection?.connectionState === 'connected') {
@@ -143,7 +145,7 @@ export class WebrtcViewModel extends EventTarget {
 
 		await this.createLocalStream();
 
-		const offer = await this.peerConnection.createOffer();
+		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true });
 
 		await this.peerConnection.setLocalDescription(offer);
 
@@ -151,12 +153,18 @@ export class WebrtcViewModel extends EventTarget {
 	}
 
 	private async createLocalStream(): Promise<MediaStream> {
+		/**
+		 * This works only with HTTPS
+		 */
+		// @todo Обработать ошибки при запросе user media
 		const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
 		console.log('localStream.audioTracks ->', localStream.getAudioTracks());
 
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-		localStream.getTracks().forEach((t) => this.peerConnection?.addTrack(t, localStream));
+		localStream.getTracks().forEach((track) => this.peerConnection?.addTrack(track, localStream));
+
+		console.log('getSenders', this.peerConnection?.getSenders());
 
 		this.dispatchEvent(new CustomEvent('localStream', { detail: localStream }));
 

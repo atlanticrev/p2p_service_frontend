@@ -19,8 +19,8 @@ export default function Page() {
 	useEffect(() => {
 		viewModel.init();
 
-		const onLocalStream = (e: Event) => {
-			const stream = (e as CustomEvent<MediaStream>).detail;
+		const onLocalStream = (event: Event) => {
+			const stream = (event as CustomEvent<MediaStream>).detail;
 
 			if (localVideoRef.current) {
 				localVideoRef.current.srcObject = stream;
@@ -29,8 +29,8 @@ export default function Page() {
 			}
 		};
 
-		const onRemoteStream = (e: Event) => {
-			const stream = (e as CustomEvent<MediaStream>).detail;
+		const onRemoteStream = (event: Event) => {
+			const stream = (event as CustomEvent<MediaStream>).detail;
 
 			if (remoteVideoRef.current) {
 				remoteVideoRef.current.srcObject = stream;
@@ -39,14 +39,14 @@ export default function Page() {
 			}
 		};
 
-		const onState = (e: Event) => {
-			const state = (e as CustomEvent<string>).detail;
+		const onState = (event: Event) => {
+			const state = (event as CustomEvent<string>).detail;
 
 			setStatus(state);
 		};
 
-		const onError = (e: Event) => {
-			console.error('WebRTC error:', (e as CustomEvent).detail);
+		const onError = (event: Event) => {
+			console.error('WebRTC error:', (event as CustomEvent).detail);
 		};
 
 		viewModel.addEventListener('localStream', onLocalStream);
