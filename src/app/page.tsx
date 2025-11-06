@@ -64,19 +64,21 @@ export default function Page() {
 		};
 	}, [viewModel]);
 
+	const startCall = () => {
+		viewModel.startCall();
+	};
+
 	return (
 		<main className={styles.container}>
 			<h2>WebRTC Video Call</h2>
 
 			<div className={styles.videoWrapper}>
-				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
-				<video ref={localVideoRef} autoPlay playsInline className={styles.video} />
+				<video ref={localVideoRef} muted autoPlay playsInline className={styles.video} />
 
-				{/** biome-ignore lint/a11y/useMediaCaption: <-> */}
-				<video ref={remoteVideoRef} autoPlay playsInline className={styles.video} />
+				<video ref={remoteVideoRef} muted={false} autoPlay playsInline className={styles.video} />
 			</div>
 
-			<button type="button" onClick={() => viewModel.startCall()} className={styles.button}>
+			<button type="button" onClick={startCall} className={styles.button}>
 				Start Call
 			</button>
 
