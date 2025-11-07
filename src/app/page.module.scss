@@ -3,48 +3,78 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
   background: #0f172a;
   color: white;
   gap: 1rem;
-  padding: 1rem;
 }
 
-.videoWrapper {
-  display: flex;
-  flex-flow: row nowrap;
-  gap: 1rem;
-  margin: 1rem 0;
-
-  @media (max-width: 768px) {
-    flex-flow: column nowrap;
-  }
+.localVideo {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  background: #111;
 }
 
-.video {
-  width: 320px;
-  height: 240px;
+.remoteVideo {
+  object-fit: cover;
   background: #111;
   border-radius: 8px;
-  object-fit: cover;
+  width: 110px;
+  aspect-ratio: 9 / 16;
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
 }
 
-.button {
-  padding: 0.75rem 1.5rem;
+%button {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: center;
+  align-items: center;
+  padding: 1.25rem;
   font-size: 1rem;
-  background: #2563eb;
   border: none;
-  border-radius: 6px;
-  color: white;
+  border-radius: 50%;
   cursor: pointer;
   transition: background 0.2s;
+}
+
+.startCallButton {
+  @extend %button;
+
+  background: #2563eb;
+  color: white;
 
   &:hover {
     background: #1d4ed8;
   }
 }
 
+.endCallButton {
+  @extend %button;
+
+  background: red;
+  color: white;
+
+  &:hover {
+    background: red;
+  }
+}
+
 .status {
   opacity: 0.8;
   font-size: 0.9rem;
+}
+
+.controls {
+  display: flex;
+  flex-flow: row nowrap;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: fixed;
+  bottom: 0;
+  padding: 24px 0;
 }

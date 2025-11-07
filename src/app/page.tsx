@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PhoneCall } from 'lucide-react';
 
 import styles from './page.module.scss';
 import { WebrtcViewModel } from './webrtc-view-model';
@@ -8,59 +9,82 @@ import { WebrtcViewModel } from './webrtc-view-model';
 const SERVER_URL = 'https://p2p-service-backend.onrender.com';
 
 export default function Page() {
-	const [viewModel] = useState(() => new WebrtcViewModel(SERVER_URL));
-
 	const [status, setStatus] = useState('disconnected');
 
 	const localVideoRef = useRef<HTMLVideoElement>(null);
-
 	const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+	const [viewModel] = useState(() => new WebrtcViewModel(SERVER_URL));
+
+	const onLocalStream = (event: Event) => {
+		const stream = (event as CustomEvent<MediaStream>).detail;
+
+		if (localVideoRef.current) {
+			localVideoRef.current.srcObject = stream;
+			localVideoRef.current.muted = true;
+
+			localVideoRef.current.play().catch((error) => console.warn(error, 'Local video play failed'));
+		}
+	};
+
+	const onRemoteStream = (event: Event) => {
+		const remoteStream = (event as CustomEvent<MediaStream>).detail;
+
+		if (remoteVideoRef.current) {
+			remoteVideoRef.current.srcObject = remoteStream;
+			remoteVideoRef.current.muted = false;
+
+			remoteVideoRef.current.play().catch((error) => console.warn(error, 'Remote video play failed'));
+		}
+	};
+
+	const onConnectionStateChange = (event: Event) => {
+		const state = (event as CustomEvent<string>).detail;
+
+		setStatus(state);
+	};
+
+	const onError = (event: Event) => {
+		console.error('WebRTC error:', (event as CustomEvent).detail);
+	};
+
+	const onCallEnd = (_: Event) => {
+		if (localVideoRef.current) {
+			localVideoRef.current = null;
+		}
+
+		if (remoteVideoRef.current) {
+			remoteVideoRef.current = null;
+		}
+	};
+
+	useEffect(() => {
+		const onBeforeUnload = () => {
+			viewModel.cleanUp();
+		};
+
+		window.addEventListener('beforeunload', onBeforeUnload);
+
+		return () => window.removeEventListener('beforeunload', onBeforeUnload);
+	}, [viewModel.cleanUp]);
 
 	useEffect(() => {
 		viewModel.init();
 
-		const onLocalStream = (event: Event) => {
-			const stream = (event as CustomEvent<MediaStream>).detail;
-
-			if (localVideoRef.current) {
-				localVideoRef.current.srcObject = stream;
-
-				localVideoRef.current.play().catch((error) => console.warn(error, 'Local video play failed'));
-			}
-		};
-
-		const onRemoteStream = (event: Event) => {
-			const stream = (event as CustomEvent<MediaStream>).detail;
-
-			if (remoteVideoRef.current) {
-				remoteVideoRef.current.srcObject = stream;
-
-				remoteVideoRef.current.play().catch((error) => console.warn(error, 'Remote video play failed'));
-			}
-		};
-
-		const onState = (event: Event) => {
-			const state = (event as CustomEvent<string>).detail;
-
-			setStatus(state);
-		};
-
-		const onError = (event: Event) => {
-			console.error('WebRTC error:', (event as CustomEvent).detail);
-		};
-
 		viewModel.addEventListener('localStream', onLocalStream);
 		viewModel.addEventListener('remoteStream', onRemoteStream);
-		viewModel.addEventListener('connectionState', onState);
+		viewModel.addEventListener('connectionState', onConnectionStateChange);
 		viewModel.addEventListener('error', onError);
+		viewModel.addEventListener('endCall', onCallEnd);
 
 		return () => {
 			viewModel.removeEventListener('localStream', onLocalStream);
 			viewModel.removeEventListener('remoteStream', onRemoteStream);
-			viewModel.removeEventListener('connectionState', onState);
+			viewModel.removeEventListener('connectionState', onConnectionStateChange);
 			viewModel.removeEventListener('error', onError);
+			viewModel.removeEventListener('endCall', onCallEnd);
 
-			viewModel.destroy();
+			viewModel.cleanUp();
 		};
 	}, [viewModel]);
 
@@ -68,21 +92,25 @@ export default function Page() {
 		viewModel.startCall();
 	};
 
+	const endCall = () => {};
+
 	return (
 		<main className={styles.container}>
-			<h2>WebRTC Video Call</h2>
+			<video ref={remoteVideoRef} muted={false} autoPlay playsInline className={styles.remoteVideo} />
 
-			<div className={styles.videoWrapper}>
-				<video ref={localVideoRef} muted autoPlay playsInline className={styles.video} />
+			<video ref={localVideoRef} muted autoPlay playsInline className={styles.localVideo} />
 
-				<video ref={remoteVideoRef} muted={false} autoPlay playsInline className={styles.video} />
+			<div className={styles.controls}>
+				{status === 'connected' ? (
+					<button type="button" onClick={endCall} className={styles.endCallButton}>
+						<PhoneCall />
+					</button>
+				) : (
+					<button type="button" onClick={startCall} className={styles.startCallButton}>
+						<PhoneCall />
+					</button>
+				)}
 			</div>
-
-			<button type="button" onClick={startCall} className={styles.button}>
-				Start Call
-			</button>
-
-			<p className={styles.status}>Status: {status}</p>
 		</main>
 	);
 }
