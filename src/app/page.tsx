@@ -116,9 +116,9 @@ export default function Page() {
 
 	return (
 		<main className={styles.container}>
-			<video ref={remoteVideoRef} muted={false} playsInline controls className={styles.remoteVideo} />
+			<video ref={remoteVideoRef} muted={false} playsInline className={styles.remoteVideo} />
 
-			<video ref={localVideoRef} muted playsInline controls className={styles.localVideo} />
+			<video ref={localVideoRef} muted playsInline className={styles.localVideo} />
 
 			<div className={styles.controls}>
 				{isCallStarted ? (
