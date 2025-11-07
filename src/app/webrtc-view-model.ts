@@ -1,29 +1,11 @@
-// biome-ignore lint/style/useNamingConvention: <->
-export type TWebRTCEvent = 'localStream' | 'remoteStream' | 'connectionState' | 'error';
+import { IS_TURN_SERVERS_USED, STUN_SERVERS, TURN_SERVERS } from '@/src/app/config';
+
+// export type TWebRTCEvent = 'localStream' | 'remoteStream' | 'connectionState' | 'error';
 
 type TSignalMessage =
 	| { type: 'offer'; offer: RTCSessionDescriptionInit }
 	| { type: 'answer'; answer: RTCSessionDescriptionInit }
 	| { type: 'candidate'; candidate: RTCIceCandidateInit };
-
-const STUN_SERVERS_CONFIG = {
-	urls: ['stun:fr-turn7.xirsys.com'],
-};
-
-const TURN_SERVERS_CONFIG = {
-	username: process.env.NEXT_PUBLIC_TURN_SERVER_USERNAME,
-	credential: process.env.NEXT_PUBLIC_TURN_SERVER_CREDENTIAL,
-	urls: [
-		'turn:fr-turn7.xirsys.com:80?transport=udp',
-		'turn:fr-turn7.xirsys.com:3478?transport=udp',
-		'turn:fr-turn7.xirsys.com:80?transport=tcp',
-		'turn:fr-turn7.xirsys.com:3478?transport=tcp',
-		'turns:fr-turn7.xirsys.com:443?transport=tcp',
-		'turns:fr-turn7.xirsys.com:5349?transport=tcp',
-	],
-};
-
-const USE_TURN_SERVERS = false;
 
 export class WebrtcViewModel extends EventTarget {
 	private webSocket: WebSocket | null = null;
@@ -109,8 +91,8 @@ export class WebrtcViewModel extends EventTarget {
 		 * RTCPeerConnection
 		 */
 		this.peerConnection = new RTCPeerConnection({
-			iceServers: [STUN_SERVERS_CONFIG, ...(USE_TURN_SERVERS ? [TURN_SERVERS_CONFIG] : [])],
-			iceTransportPolicy: 'all', // Allow only p2p connection
+			iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
+			iceTransportPolicy: 'all', // @todo Allow only p2p connection
 		});
 
 		this.peerConnection.addEventListener('track', (event) => {

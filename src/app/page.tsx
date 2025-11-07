@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { PhoneCall } from 'lucide-react';
 
+import { SERVER_URL } from '@/src/app/config';
+
 import styles from './page.module.scss';
 import { WebrtcViewModel } from './webrtc-view-model';
-
-const SERVER_URL = 'https://p2p-service-backend.onrender.com';
 
 export default function Page() {
 	const [_, setStatus] = useState('disconnected');
