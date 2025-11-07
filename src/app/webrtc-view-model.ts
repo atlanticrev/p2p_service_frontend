@@ -53,6 +53,9 @@ export class WebrtcViewModel extends EventTarget {
 	}
 
 	async init() {
+		/**
+		 * WebSocket
+		 */
 		this.webSocket = new WebSocket(this.serverUrl);
 
 		this.webSocket?.addEventListener('message', async (event) => {
@@ -62,6 +65,7 @@ export class WebrtcViewModel extends EventTarget {
 
 			const data: TSignalMessage = JSON.parse(event.data);
 
+			// @todo Debug
 			try {
 				/**
 				 * Тут я получаю предложение от другого участника соединиться
@@ -94,7 +98,16 @@ export class WebrtcViewModel extends EventTarget {
 				this.dispatchEvent(new CustomEvent('error', { detail: error }));
 			}
 		});
+	}
 
+	async startCall() {
+		if (!this.webSocket) {
+			throw new Error('Connection to signaling server is not initialized');
+		}
+
+		/**
+		 * RTCPeerConnection
+		 */
 		this.peerConnection = new RTCPeerConnection({
 			iceServers: [STUN_SERVERS_CONFIG, ...(USE_TURN_SERVERS ? [TURN_SERVERS_CONFIG] : [])],
 			iceTransportPolicy: 'all', // Allow only p2p connection
@@ -104,11 +117,9 @@ export class WebrtcViewModel extends EventTarget {
 			console.log('Incoming track:', event.track.kind, event.streams);
 
 			/**
-			 * Этот медиа поток уже содержит все дорожки которые согласился прислать пир (аудио, видео)
+			 * Этот медиа-поток уже содержит все дорожки которые согласился прислать пир (аудио, видео)
 			 */
-			const remoteStream = event.streams[0];
-
-			this.dispatchEvent(new CustomEvent('remoteStream', { detail: remoteStream }));
+			this.dispatchEvent(new CustomEvent('remoteStream', { detail: event.streams[0] }));
 		});
 
 		this.peerConnection.addEventListener('icecandidate', (event) => {
@@ -126,17 +137,10 @@ export class WebrtcViewModel extends EventTarget {
 
 			this.dispatchEvent(new CustomEvent('connectionState', { detail: this.peerConnection?.connectionState }));
 		});
-	}
-
-	async startCall() {
-		if (!this.peerConnection || !this.webSocket) {
-			throw new Error('Not initialized');
-		}
 
 		await this.createLocalStream();
 
 		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true });
-
 		await this.peerConnection.setLocalDescription(offer);
 
 		this.webSocket.send(JSON.stringify({ type: 'offer', offer }));

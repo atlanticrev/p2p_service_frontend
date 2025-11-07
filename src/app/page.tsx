@@ -9,7 +9,9 @@ import { WebrtcViewModel } from './webrtc-view-model';
 const SERVER_URL = 'https://p2p-service-backend.onrender.com';
 
 export default function Page() {
-	const [status, setStatus] = useState('disconnected');
+	const [_, setStatus] = useState('disconnected');
+
+	const [isCallStarted, setIsCallStarted] = useState(false);
 
 	const localVideoRef = useRef<HTMLVideoElement>(null);
 	const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -39,9 +41,9 @@ export default function Page() {
 	};
 
 	const onConnectionStateChange = (event: Event) => {
-		const state = (event as CustomEvent<string>).detail;
+		const connectionState = (event as CustomEvent<string>).detail;
 
-		setStatus(state);
+		setStatus(connectionState);
 	};
 
 	const onError = (event: Event) => {
@@ -56,6 +58,18 @@ export default function Page() {
 		if (remoteVideoRef.current) {
 			remoteVideoRef.current = null;
 		}
+	};
+
+	const startCall = () => {
+		setIsCallStarted(true);
+
+		viewModel.startCall();
+	};
+
+	const endCall = () => {
+		setIsCallStarted(false);
+
+		viewModel.endCall();
 	};
 
 	useEffect(() => {
@@ -88,12 +102,6 @@ export default function Page() {
 		};
 	}, [viewModel]);
 
-	const startCall = () => {
-		viewModel.startCall();
-	};
-
-	const endCall = () => {};
-
 	return (
 		<main className={styles.container}>
 			<video ref={remoteVideoRef} muted={false} autoPlay playsInline className={styles.remoteVideo} />
@@ -101,7 +109,7 @@ export default function Page() {
 			<video ref={localVideoRef} muted autoPlay playsInline className={styles.localVideo} />
 
 			<div className={styles.controls}>
-				{status === 'connected' ? (
+				{isCallStarted ? (
 					<button type="button" onClick={endCall} className={styles.endCallButton}>
 						<PhoneCall />
 					</button>
