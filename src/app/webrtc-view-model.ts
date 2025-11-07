@@ -32,9 +32,9 @@ export class WebrtcViewModel extends EventTarget {
 
 	private readonly serverUrl: string;
 
-	localStream: MediaStream;
+	localStream: MediaStream | undefined;
 
-	remoteStream: MediaStream;
+	remoteStream: MediaStream | undefined;
 
 	constructor(serverUrl: string) {
 		super();
@@ -172,8 +172,10 @@ export class WebrtcViewModel extends EventTarget {
 
 		console.log('localStream.audioTracks ->', this.localStream.getAudioTracks());
 
+		// @todo Избавиться (без этого ругается .addTrack(track, stream))
+		const stream = this.localStream;
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-		this.localStream.getTracks().forEach((track) => this.peerConnection?.addTrack(track, this.localStream));
+		this.localStream.getTracks().forEach((track) => this.peerConnection?.addTrack(track, stream));
 
 		console.log('getSenders', this.peerConnection?.getSenders());
 
