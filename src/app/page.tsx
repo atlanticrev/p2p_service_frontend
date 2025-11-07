@@ -35,6 +35,16 @@ export default function Page() {
 			remoteVideoRef.current.srcObject = remoteStream;
 			remoteVideoRef.current.muted = false;
 			remoteVideoRef.current.volume = 1.0;
+
+			// Вызов play() для гарантии воспроизведения
+			remoteVideoRef.current
+				.play()
+				.then(() => {
+					console.log('Remote video started playing');
+				})
+				.catch((err) => {
+					console.warn('Remote video autoplay was prevented:', err);
+				});
 		}
 	};
 
@@ -49,12 +59,16 @@ export default function Page() {
 	};
 
 	const onCallEnd = (_: Event) => {
-		if (localVideoRef.current) {
-			localVideoRef.current = null;
+		if (localVideoRef.current?.srcObject) {
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
+			(localVideoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+			localVideoRef.current.srcObject = null;
 		}
 
-		if (remoteVideoRef.current) {
-			remoteVideoRef.current = null;
+		if (remoteVideoRef.current?.srcObject) {
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
+			(remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+			remoteVideoRef.current.srcObject = null;
 		}
 	};
 
@@ -78,7 +92,7 @@ export default function Page() {
 		window.addEventListener('beforeunload', onBeforeUnload);
 
 		return () => window.removeEventListener('beforeunload', onBeforeUnload);
-	}, [viewModel.cleanUp]);
+	}, []);
 
 	useEffect(() => {
 		viewModel.init();

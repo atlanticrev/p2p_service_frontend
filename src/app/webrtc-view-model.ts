@@ -20,6 +20,8 @@ export class WebrtcViewModel extends EventTarget {
 
 	remoteStream: MediaStream | undefined;
 
+	logIntervalMs: number | undefined = 0;
+
 	constructor(serverUrl: string) {
 		super();
 
@@ -151,7 +153,7 @@ export class WebrtcViewModel extends EventTarget {
 		// Получаем локальный стрим и добавляем треки
 		await this.createLocalStream();
 
-		// Создаём оффер
+		// Создаём офер
 		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
 		await this.peerConnection.setLocalDescription(offer);
 
@@ -163,6 +165,10 @@ export class WebrtcViewModel extends EventTarget {
 
 	endCall() {
 		console.log('endCall');
+
+		if (typeof window !== 'undefined') {
+			window.clearInterval(this.logIntervalMs);
+		}
 
 		// 1. Остановить локальные треки
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
@@ -194,6 +200,11 @@ export class WebrtcViewModel extends EventTarget {
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 
+		this.localStream
+			.getAudioTracks()
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
+			.forEach((track) => console.log('[Local stream] audio track info ->', track.readyState, track.enabled));
+
 		// @todo Избавиться (без этого ругается ниже)
 		const stream = this.localStream;
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
@@ -221,7 +232,11 @@ export class WebrtcViewModel extends EventTarget {
 	}
 
 	logStats(peerConnection: RTCPeerConnection) {
-		setInterval(async () => {
+		if (typeof window === 'undefined') {
+			return;
+		}
+
+		this.logIntervalMs = window.setInterval(async () => {
 			peerConnection.getReceivers().forEach((r) => {
 				console.log('getReceivers info -> ', r.track.kind, r.track.readyState);
 			});
