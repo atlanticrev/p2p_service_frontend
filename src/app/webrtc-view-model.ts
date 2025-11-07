@@ -58,7 +58,6 @@ export class WebrtcViewModel extends EventTarget {
 					await this.createLocalStream();
 
 					const answer = await this.peerConnection.createAnswer();
-
 					await this.peerConnection.setLocalDescription(answer);
 
 					this.webSocket?.send(JSON.stringify({ type: 'answer', answer }));
@@ -129,8 +128,9 @@ export class WebrtcViewModel extends EventTarget {
 		await this.createLocalStream();
 
 		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true });
-
 		await this.peerConnection.setLocalDescription(offer);
+
+		console.log('Local SDP ->', this.peerConnection?.localDescription?.sdp);
 
 		this.webSocket.send(JSON.stringify({ type: 'offer', offer }));
 	}
