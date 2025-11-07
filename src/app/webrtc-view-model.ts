@@ -100,7 +100,13 @@ export class WebrtcViewModel extends EventTarget {
 		this.peerConnection.addEventListener('track', (event) => {
 			console.log('Incoming Remote track:', event.track.kind);
 
-			this.dispatchEvent(new CustomEvent('remoteStream', { detail: event.streams[0] }));
+			const remoteStream = event.streams[0];
+
+			remoteStream.getTracks().forEach((track) => {
+				track.enabled = true;
+			});
+
+			this.dispatchEvent(new CustomEvent('remoteStream', { detail: remoteStream }));
 		});
 
 		this.peerConnection.addEventListener('icecandidate', (event) => {
@@ -202,10 +208,10 @@ export class WebrtcViewModel extends EventTarget {
 		this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 		const stream = this.localStream;
 
+		// Включаем все аудио и видео треки перед добавлением
 		stream.getTracks().forEach((track) => {
-			if (!this.peerConnection?.getSenders().find((sender) => sender.track === track)) {
-				this.peerConnection?.addTrack(track, stream);
-			}
+			track.enabled = true; // включаем трек
+			this.peerConnection?.addTrack(track, stream);
 		});
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
