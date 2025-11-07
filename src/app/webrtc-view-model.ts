@@ -5,7 +5,9 @@ import { IS_TURN_SERVERS_USED, STUN_SERVERS, TURN_SERVERS } from '@/src/app/conf
 type TSignalMessage =
 	| { type: 'offer'; offer: RTCSessionDescriptionInit }
 	| { type: 'answer'; answer: RTCSessionDescriptionInit }
-	| { type: 'candidate'; candidate: RTCIceCandidateInit };
+	| { type: 'candidate'; candidate: RTCIceCandidateInit }
+	| { type: 'startOffer' }
+	| { type: 'ready' };
 
 export class WebrtcViewModel extends EventTarget {
 	private webSocket: WebSocket | null = null;
@@ -22,16 +24,6 @@ export class WebrtcViewModel extends EventTarget {
 		super();
 
 		this.serverUrl = serverUrl;
-
-		// @todo Избавиться от создания лишнего MediaStream
-		if (typeof window !== 'undefined' && typeof MediaStream !== 'undefined') {
-			this.localStream = new MediaStream();
-		}
-
-		// @todo Избавиться от создания лишнего MediaStream
-		if (typeof window !== 'undefined' && typeof MediaStream !== 'undefined') {
-			this.remoteStream = new MediaStream();
-		}
 	}
 
 	async init() {
@@ -41,20 +33,34 @@ export class WebrtcViewModel extends EventTarget {
 		this.webSocket = new WebSocket(this.serverUrl);
 
 		this.webSocket?.addEventListener('message', async (event) => {
-			if (!this.peerConnection) {
-				return;
-			}
-
 			const data: TSignalMessage = JSON.parse(event.data);
 
 			// @todo Debug
 			try {
 				/**
+				 * Сервер просит сформировать офер
+				 */
+				if (data.type === 'startOffer') {
+					await this.startOffer();
+				}
+
+				/**
 				 * Тут я получаю предложение от другого участника соединиться
 				 */
 				if (data.type === 'offer') {
+					// создаём peerConnection только если ещё не было
+					if (!this.peerConnection) {
+						this.peerConnection = new RTCPeerConnection({
+							iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
+							iceTransportPolicy: 'all',
+						});
+
+						this.setupPeerConnectionEvents();
+					}
+
 					await this.peerConnection.setRemoteDescription(data.offer);
 
+					// теперь точно можно создать локальный поток и добавить треки
 					await this.createLocalStream();
 
 					const answer = await this.peerConnection.createAnswer();
@@ -67,14 +73,14 @@ export class WebrtcViewModel extends EventTarget {
 				 * Тут я отправляю ответ на приглашение присоединиться
 				 */
 				if (data.type === 'answer') {
-					await this.peerConnection.setRemoteDescription(data.answer);
+					await this.peerConnection?.setRemoteDescription(data.answer);
 				}
 
 				/**
 				 * Тут я ?
 				 */
 				if (data.type === 'candidate') {
-					await this.peerConnection.addIceCandidate(data.candidate);
+					await this.peerConnection?.addIceCandidate(data.candidate);
 				}
 			} catch (error) {
 				this.dispatchEvent(new CustomEvent('error', { detail: error }));
@@ -82,27 +88,14 @@ export class WebrtcViewModel extends EventTarget {
 		});
 	}
 
-	async startCall() {
-		if (!this.webSocket) {
-			throw new Error('Connection to signaling server is not initialized');
+	private setupPeerConnectionEvents() {
+		if (!this.peerConnection) {
+			return;
 		}
 
-		/**
-		 * RTCPeerConnection
-		 */
-		this.peerConnection = new RTCPeerConnection({
-			iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
-			iceTransportPolicy: 'all', // @todo Allow only p2p connection
-		});
-
 		this.peerConnection.addEventListener('track', (event) => {
-			console.log('Incoming Remote track:', event.track.kind, event.streams);
+			console.log('Incoming Remote track:', event.track.kind);
 
-			console.log('[Remote stream] audio tracks ->', event.streams[0].getAudioTracks());
-
-			/**
-			 * Этот медиа-поток уже содержит все дорожки которые согласился прислать пир (аудио, видео)
-			 */
 			this.dispatchEvent(new CustomEvent('remoteStream', { detail: event.streams[0] }));
 		});
 
@@ -112,27 +105,60 @@ export class WebrtcViewModel extends EventTarget {
 			}
 		});
 
-		this.peerConnection.addEventListener('connectionstatechange', async () => {
-			if (this.peerConnection?.connectionState === 'connected') {
-				console.log('✅ Peers connected — start logging stats...');
-
-				this.logStats(this.peerConnection);
-			}
+		this.peerConnection.addEventListener('connectionstatechange', () => {
+			console.log('🔗 Connection state:', this.peerConnection?.connectionState);
 
 			this.dispatchEvent(new CustomEvent('connectionState', { detail: this.peerConnection?.connectionState }));
+
+			if (this.peerConnection?.connectionState === 'connected') {
+				this.logStats(this.peerConnection);
+			}
 		});
+	}
+
+	async startCall() {
+		if (!this.webSocket) {
+			throw new Error('Connection to signaling server is not initialized');
+		}
+
+		if (this.peerConnection) {
+			console.warn('PeerConnection уже существует, startOffer пропущен');
+
+			return;
+		}
+
+		console.log('📞 Sending ready signal to server...');
+
+		this.webSocket.send(JSON.stringify({ type: 'ready' }));
+	}
+
+	private async startOffer() {
+		console.log('🎬 startOffer — создаём peerConnection и локальный поток');
+
+		// Инициализация peerConnection (если ещё не создан)
+		if (!this.peerConnection) {
+			this.peerConnection = new RTCPeerConnection({
+				iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
+				iceTransportPolicy: 'all',
+			});
+
+			this.setupPeerConnectionEvents();
+		}
 
 		/**
 		 * RTC Offer
 		 */
+		// Получаем локальный стрим и добавляем треки
 		await this.createLocalStream();
 
-		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true });
+		// Создаём оффер
+		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
 		await this.peerConnection.setLocalDescription(offer);
 
-		console.log('Local SDP ->', this.peerConnection?.localDescription?.sdp);
+		console.log('Local SDP ->', this.peerConnection.localDescription?.sdp);
 
-		this.webSocket.send(JSON.stringify({ type: 'offer', offer }));
+		// Отправляем оффер через WebSocket
+		this.webSocket?.send(JSON.stringify({ type: 'offer', offer }));
 	}
 
 	endCall() {
@@ -150,6 +176,9 @@ export class WebrtcViewModel extends EventTarget {
 			this.peerConnection = null;
 		}
 
+		this.localStream = undefined;
+		this.remoteStream = undefined;
+
 		// 3. Сообщить удалённой стороне
 		this.webSocket?.send(JSON.stringify({ type: 'hangup' }));
 
@@ -165,7 +194,7 @@ export class WebrtcViewModel extends EventTarget {
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 
-		// @todo Избавиться (без этого ругается .addTrack(track, stream))
+		// @todo Избавиться (без этого ругается ниже)
 		const stream = this.localStream;
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
 		this.localStream.getTracks().forEach((track) => this.peerConnection?.addTrack(track, stream));
