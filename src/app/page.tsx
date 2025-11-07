@@ -25,6 +25,16 @@ export default function Page() {
 			localVideoRef.current.srcObject = stream;
 			localVideoRef.current.muted = true;
 			localVideoRef.current.volume = 1.0;
+
+			// Вызов play() для гарантии воспроизведения
+			localVideoRef.current
+				.play()
+				.then(() => {
+					console.log('Local video started playing...');
+				})
+				.catch((err) => {
+					console.warn('Local video autoplay was prevented:', err);
+				});
 		}
 	};
 
@@ -40,7 +50,7 @@ export default function Page() {
 			remoteVideoRef.current
 				.play()
 				.then(() => {
-					console.log('Remote video started playing');
+					console.log('Remote video started playing...');
 				})
 				.catch((err) => {
 					console.warn('Remote video autoplay was prevented:', err);
@@ -118,7 +128,7 @@ export default function Page() {
 		<main className={styles.container}>
 			<video ref={remoteVideoRef} muted={false} playsInline autoPlay className={styles.remoteVideo} />
 
-			<video ref={localVideoRef} muted={false} playsInline autoPlay className={styles.localVideo} />
+			<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
 
 			<div className={styles.controls}>
 				{isCallStarted ? (
