@@ -24,6 +24,7 @@ export default function Page() {
 		if (localVideoRef.current) {
 			localVideoRef.current.srcObject = stream;
 			localVideoRef.current.muted = true;
+			localVideoRef.current.volume = 1.0;
 		}
 	};
 
@@ -33,6 +34,7 @@ export default function Page() {
 		if (remoteVideoRef.current) {
 			remoteVideoRef.current.srcObject = remoteStream;
 			remoteVideoRef.current.muted = false;
+			remoteVideoRef.current.volume = 1.0;
 		}
 	};
 

@@ -58,6 +58,7 @@ export class WebrtcViewModel extends EventTarget {
 					await this.createLocalStream();
 
 					const answer = await this.peerConnection.createAnswer();
+
 					await this.peerConnection.setLocalDescription(answer);
 
 					this.webSocket?.send(JSON.stringify({ type: 'answer', answer }));
@@ -96,7 +97,9 @@ export class WebrtcViewModel extends EventTarget {
 		});
 
 		this.peerConnection.addEventListener('track', (event) => {
-			console.log('Incoming track:', event.track.kind, event.streams);
+			console.log('Incoming Remote track:', event.track.kind, event.streams);
+
+			console.log('[Remote stream] audio tracks ->', event.streams[0].getAudioTracks());
 
 			/**
 			 * Этот медиа-поток уже содержит все дорожки которые согласился прислать пир (аудио, видео)
@@ -120,9 +123,13 @@ export class WebrtcViewModel extends EventTarget {
 			this.dispatchEvent(new CustomEvent('connectionState', { detail: this.peerConnection?.connectionState }));
 		});
 
+		/**
+		 * RTC Offer
+		 */
 		await this.createLocalStream();
 
 		const offer = await this.peerConnection.createOffer({ offerToReceiveAudio: true });
+
 		await this.peerConnection.setLocalDescription(offer);
 
 		this.webSocket.send(JSON.stringify({ type: 'offer', offer }));
@@ -156,14 +163,14 @@ export class WebrtcViewModel extends EventTarget {
 		// @todo Обработать ошибки при запросе user media
 		this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-		console.log('localStream.audioTracks ->', this.localStream.getAudioTracks());
+		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 
 		// @todo Избавиться (без этого ругается .addTrack(track, stream))
 		const stream = this.localStream;
 		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
 		this.localStream.getTracks().forEach((track) => this.peerConnection?.addTrack(track, stream));
 
-		console.log('getSenders', this.peerConnection?.getSenders());
+		console.log('Tracks transmitters ->', this.peerConnection?.getSenders());
 
 		this.dispatchEvent(new CustomEvent('localStream', { detail: this.localStream }));
 	}
@@ -186,6 +193,10 @@ export class WebrtcViewModel extends EventTarget {
 
 	logStats(peerConnection: RTCPeerConnection) {
 		setInterval(async () => {
+			peerConnection.getReceivers().forEach((r) => {
+				console.log('getReceivers info -> ', r.track.kind, r.track.readyState);
+			});
+
 			const stats = await peerConnection.getStats();
 
 			const audio = { inbound: {}, outbound: {} };
@@ -193,11 +204,10 @@ export class WebrtcViewModel extends EventTarget {
 			stats.forEach((report) => {
 				if (report.type === 'candidate-pair' && report.state === 'succeeded') {
 					const local = stats.get(report.localCandidateId);
-
 					const remote = stats.get(report.remoteCandidateId);
 
 					// candidateType might be - 'host', 'srflx', 'prflx', 'relay'
-					console.log('✅ Connected via:', local.candidateType, '/', remote.candidateType);
+					console.log('✅ Peers connected via:', local.candidateType, '/', remote.candidateType);
 				}
 
 				if (report.type === 'inbound-rtp' && report.kind === 'audio') {
@@ -216,8 +226,7 @@ export class WebrtcViewModel extends EventTarget {
 				}
 			});
 
-			console.log('Audio info:');
-
+			console.log('Peer connection audio info ->');
 			console.table(audio);
 		}, 2_000);
 	}
