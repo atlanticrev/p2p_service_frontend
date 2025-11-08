@@ -17,4 +17,4 @@ export const TURN_SERVERS = {
 	],
 };
 
-export const IS_TURN_SERVERS_USED = true;
+export const IS_TURN_SERVERS_USED = false;
