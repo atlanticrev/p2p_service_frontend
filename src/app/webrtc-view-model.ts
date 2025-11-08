@@ -54,7 +54,7 @@ export class WebrtcViewModel extends EventTarget {
 					if (!this.peerConnection) {
 						this.peerConnection = new RTCPeerConnection({
 							iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
-							iceTransportPolicy: 'all',
+							// iceTransportPolicy: 'all',
 						});
 
 						this.setupPeerConnectionEvents();
