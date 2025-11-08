@@ -213,6 +213,11 @@ export class WebrtcViewModel extends EventTarget {
 		// @todo Обработать ошибки при запросе user media
 		this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
+		navigator.mediaDevices.enumerateDevices().then((devices) => {
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
+			devices.forEach((d) => console.log(`Media devices - ${d.kind}: ${d.label} id=${d.deviceId}`));
+		});
+
 		this.localStream.getAudioTracks()[0].onmute = () => console.warn('local track muted');
 
 		this.localStream.getAudioTracks()[0].onunmute = () => console.warn('local track unmuted');

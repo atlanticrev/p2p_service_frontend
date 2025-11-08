@@ -54,6 +54,9 @@ export default function Page() {
 				})
 				.catch((err) => {
 					console.warn('Remote video autoplay was prevented:', err);
+				})
+				.finally(() => {
+					console.log('Volume:', remoteVideoRef.current?.volume, 'Muted:', remoteVideoRef.current?.muted);
 				});
 		}
 	};
