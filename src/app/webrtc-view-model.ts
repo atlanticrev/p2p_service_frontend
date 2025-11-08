@@ -70,6 +70,8 @@ export class WebrtcViewModel extends EventTarget {
 					const answer = await this.peerConnection.createAnswer();
 					await this.peerConnection.setLocalDescription(answer);
 
+					console.log('ANSWER SDP:', this.peerConnection?.localDescription?.sdp);
+
 					this.webSocket?.send(JSON.stringify({ type: 'answer', answer }));
 				}
 
@@ -98,7 +100,9 @@ export class WebrtcViewModel extends EventTarget {
 		}
 
 		this.peerConnection.addEventListener('track', (event) => {
-			console.log('Incoming Remote track:', event.track.kind);
+			console.log('Incoming Remote track:', event.track.kind, event.track.readyState);
+
+			console.log('Incoming streams:', event.streams);
 
 			const remoteStream = event.streams[0];
 
@@ -117,6 +121,8 @@ export class WebrtcViewModel extends EventTarget {
 
 		this.peerConnection.addEventListener('connectionstatechange', () => {
 			console.log('🔗 Connection state:', this.peerConnection?.connectionState);
+
+			console.log('🔗 ICE Connection state:', this.peerConnection?.iceConnectionState);
 
 			this.dispatchEvent(new CustomEvent('connectionState', { detail: this.peerConnection?.connectionState }));
 
@@ -206,6 +212,11 @@ export class WebrtcViewModel extends EventTarget {
 		 */
 		// @todo Обработать ошибки при запросе user media
 		this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+		this.localStream.getAudioTracks()[0].onmute = () => console.warn('local track muted');
+
+		this.localStream.getAudioTracks()[0].onunmute = () => console.warn('local track unmuted');
+
 		const stream = this.localStream;
 
 		// Включаем все аудио и видео треки перед добавлением
@@ -216,12 +227,14 @@ export class WebrtcViewModel extends EventTarget {
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 
-		stream
-			.getAudioTracks()
-			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-			.forEach((track) => console.log('[Local stream] audio track info ->', track.readyState, track.enabled));
+		console.log(
+			'[Local stream] all tracks ->',
+			stream
+				.getTracks()
+				.map((track) => ({ kind: track.kind, readyState: track.readyState, enabled: track.enabled })),
+		);
 
-		console.log('Tracks transmitters ->', this.peerConnection?.getSenders());
+		console.log('Track transmitters ->', this.peerConnection?.getSenders());
 
 		this.dispatchEvent(new CustomEvent('localStream', { detail: stream }));
 	}
