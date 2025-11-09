@@ -9,7 +9,7 @@ import styles from './page.module.scss';
 import { WebrtcViewModel } from './webrtc-view-model';
 
 export default function Page() {
-	const [_, setStatus] = useState('disconnected');
+	const [status, setStatus] = useState('disconnected');
 
 	const [isCallStarted, setIsCallStarted] = useState(false);
 
@@ -131,18 +131,22 @@ export default function Page() {
 		<main className={styles.container}>
 			<video ref={remoteVideoRef} muted={false} playsInline autoPlay className={styles.remoteVideo} />
 
-			{/*<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />*/}
+			<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
 
 			<div className={styles.controls}>
-				{isCallStarted ? (
-					<button type="button" onClick={endCall} className={styles.endCallButton}>
-						<PhoneCall />
-					</button>
-				) : (
-					<button type="button" onClick={startCall} className={styles.startCallButton}>
-						<PhoneCall />
-					</button>
-				)}
+				<div>
+					{isCallStarted ? (
+						<button type="button" onClick={endCall} className={styles.endCallButton}>
+							<PhoneCall />
+						</button>
+					) : (
+						<button type="button" onClick={startCall} className={styles.startCallButton}>
+							<PhoneCall />
+						</button>
+					)}
+				</div>
+
+				<p>Status: {status}</p>
 			</div>
 		</main>
 	);
