@@ -25,6 +25,22 @@ type TLegacyGetUserMedia = (
 	errorCallback: (error: DOMException) => void,
 ) => void;
 
+const HIGH_QUALITY_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+	width: { min: 640, ideal: 1920, max: 3840 },
+	height: { min: 480, ideal: 1080, max: 2160 },
+	frameRate: { ideal: 30, max: 60 },
+	facingMode: 'user',
+};
+
+const HIGH_QUALITY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+	echoCancellation: true,
+	noiseSuppression: true,
+	autoGainControl: true,
+	channelCount: { ideal: 2, max: 2 },
+	sampleRate: { ideal: 48_000 },
+	sampleSize: { ideal: 16 },
+};
+
 export class WebrtcViewModel extends EventTarget {
 	private webSocket: WebSocket | null = null;
 
@@ -306,6 +322,38 @@ export class WebrtcViewModel extends EventTarget {
 		});
 	}
 
+	private applySenderQualityProfile() {
+		if (!this.peerConnection) {
+			return;
+		}
+
+		this.peerConnection.getSenders().forEach((sender) => {
+			const track = sender.track;
+
+			if (!track) {
+				return;
+			}
+
+			const parameters = sender.getParameters();
+			parameters.encodings = parameters.encodings && parameters.encodings.length > 0 ? parameters.encodings : [{}];
+
+			if (track.kind === 'video') {
+				track.contentHint = 'detail';
+				parameters.encodings[0].maxBitrate = 3_500_000;
+				parameters.encodings[0].maxFramerate = 30;
+				parameters.encodings[0].scaleResolutionDownBy = 1;
+			}
+
+			if (track.kind === 'audio') {
+				parameters.encodings[0].maxBitrate = 128_000;
+			}
+
+			void sender.setParameters(parameters).catch((error) => {
+				console.warn(`Failed to set sender parameters for ${track.kind}`, error);
+			});
+		});
+	}
+
 	async startCall() {
 		if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
 			await this.init();
@@ -414,13 +462,8 @@ export class WebrtcViewModel extends EventTarget {
 		 */
 		// @todo Обработать ошибки при запросе user media
 		this.localStream = await this.requestUserMedia({
-			video: true,
-			audio: {
-				echoCancellation: true,
-				noiseSuppression: true,
-				autoGainControl: true,
-				channelCount: 1,
-			},
+			video: HIGH_QUALITY_VIDEO_CONSTRAINTS,
+			audio: HIGH_QUALITY_AUDIO_CONSTRAINTS,
 		});
 
 		if (navigator.mediaDevices?.enumerateDevices) {
@@ -432,6 +475,10 @@ export class WebrtcViewModel extends EventTarget {
 
 		const [localAudioTrack] = this.localStream.getAudioTracks();
 		const localVideoTracks = this.localStream.getVideoTracks();
+
+		localVideoTracks.forEach((track) => {
+			track.contentHint = 'detail';
+		});
 
 		if (localAudioTrack) {
 			localAudioTrack.onmute = () => console.warn('local track muted');
@@ -452,6 +499,8 @@ export class WebrtcViewModel extends EventTarget {
 			track.enabled = true; // включаем трек
 			this.peerConnection?.addTrack(track, outgoingStream);
 		});
+
+		this.applySenderQualityProfile();
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 

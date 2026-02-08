@@ -259,14 +259,16 @@ export default function Page() {
 								<p className={styles.callRoom}>{roomTitle}</p>
 								<p className={styles.callState}>{remoteParticipantInCall ? 'В звонке' : 'Ожидание собеседника'}</p>
 							</div>
-
-							<button type="button" onClick={endCall} className={styles.callEndButton}>
-								<PhoneOff size={16} />
-								Выйти
-							</button>
 						</div>
 
 						<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
+
+						<div className={styles.callActions}>
+							<button type="button" onClick={endCall} className={styles.callExitButton}>
+								<PhoneOff size={18} />
+								Выйти
+							</button>
+						</div>
 					</section>
 				</section>
 			</main>
