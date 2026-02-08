@@ -194,6 +194,7 @@ export default function Page() {
 
 	const remoteParticipantInRoom = isRoomJoined ? roomState.participants > 1 : roomState.participants > 0;
 	const remoteParticipantInCall = hasRemoteParticipant || status === 'connected';
+	const pageClassName = `${styles.page} ${isRoomJoined ? styles.pageCall : styles.pageLobby}`;
 
 	useEffect(() => {
 		const onBeforeUnload = () => {
@@ -244,8 +245,36 @@ export default function Page() {
 		};
 	}, [viewModel]);
 
+	if (isRoomJoined) {
+		return (
+			<main className={pageClassName}>
+				<section className={styles.callScreen}>
+					<section className={`${styles.videoStage} ${styles.callVideoStage}`}>
+						<video ref={remoteVideoRef} muted={false} playsInline autoPlay className={styles.remoteVideo} />
+
+						{remoteParticipantInCall ? null : <div className={styles.waitingOverlay}>Ожидаем подключение собеседника...</div>}
+
+						<div className={styles.callHud}>
+							<div className={styles.callMeta}>
+								<p className={styles.callRoom}>{roomTitle}</p>
+								<p className={styles.callState}>{remoteParticipantInCall ? 'В звонке' : 'Ожидание собеседника'}</p>
+							</div>
+
+							<button type="button" onClick={endCall} className={styles.callEndButton}>
+								<PhoneOff size={16} />
+								Выйти
+							</button>
+						</div>
+
+						<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
+					</section>
+				</section>
+			</main>
+		);
+	}
+
 	return (
-		<main className={styles.page}>
+		<main className={pageClassName}>
 			<section className={styles.roomCard}>
 				<div className={styles.roomHeader}>
 					<p className={styles.roomLabel}>Комната</p>
@@ -257,62 +286,25 @@ export default function Page() {
 				<div className={styles.peopleList}>
 					<div className={styles.personCard}>
 						<p className={styles.personName}>Вы</p>
-						<p className={styles.personState}>{isJoining ? 'Подключение...' : isRoomJoined ? 'В комнате' : 'Не подключены'}</p>
+						<p className={styles.personState}>{isJoining ? 'Подключение...' : 'Не подключены'}</p>
 					</div>
 
 					<div className={styles.personCard}>
 						<p className={styles.personName}>Собеседник</p>
-						<p className={styles.personState}>
-							{remoteParticipantInCall
-								? 'В звонке'
-								: remoteParticipantInRoom
-									? 'В комнате'
-									: isRoomJoined
-										? 'Ожидаем вход'
-										: 'Комната пуста'}
-						</p>
+						<p className={styles.personState}>{remoteParticipantInRoom ? 'В комнате' : 'Комната пуста'}</p>
 					</div>
 				</div>
 
 				<div className={styles.controls}>
-					{isRoomJoined ? (
-						<button type="button" onClick={endCall} className={styles.endCallButton}>
-							<PhoneOff size={18} />
-							Покинуть комнату
-						</button>
-					) : (
-						<button type="button" onClick={() => void startCall()} className={styles.startCallButton} disabled={isJoining}>
-							<PhoneCall size={18} />
-							{isJoining ? 'Подключаем...' : 'Присоединиться к комнате'}
-						</button>
-					)}
+					<button type="button" onClick={() => void startCall()} className={styles.startCallButton} disabled={isJoining}>
+						<PhoneCall size={18} />
+						{isJoining ? 'Подключаем...' : 'Присоединиться к комнате'}
+					</button>
 
 					<p className={styles.status}>Статус: {statusLabel}</p>
 					{errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
 				</div>
 			</section>
-
-			{isRoomJoined ? (
-				<section className={styles.videoStage}>
-					<video ref={remoteVideoRef} muted={false} playsInline autoPlay className={styles.remoteVideo} />
-
-					{remoteParticipantInCall ? null : <div className={styles.waitingOverlay}>Ожидаем подключение собеседника...</div>}
-
-					<div className={styles.callHud}>
-						<div className={styles.callMeta}>
-							<p className={styles.callRoom}>{roomTitle}</p>
-							<p className={styles.callState}>{remoteParticipantInCall ? 'В звонке' : 'Ожидание собеседника'}</p>
-						</div>
-
-						<button type="button" onClick={endCall} className={styles.callEndButton}>
-							<PhoneOff size={16} />
-							Выйти
-						</button>
-					</div>
-
-					<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
-				</section>
-			) : null}
 		</main>
 	);
 }
