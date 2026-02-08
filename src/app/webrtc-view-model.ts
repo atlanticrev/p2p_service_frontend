@@ -7,16 +7,36 @@ type TSignalMessage =
 	| { type: 'answer'; answer: RTCSessionDescriptionInit }
 	| { type: 'candidate'; candidate: RTCIceCandidateInit }
 	| { type: 'startOffer' }
-	| { type: 'ready' };
+	| { type: 'ready' }
+	| { type: 'hangup' }
+	| { type: 'status'; message: string }
+	| { type: 'roomState'; participants: number; capacity: number }
+	| { type: 'roomFull'; message?: string }
+	| { type: 'error'; message?: string };
+
+export type TRoomState = {
+	participants: number;
+	capacity: number;
+};
 
 export class WebrtcViewModel extends EventTarget {
 	private webSocket: WebSocket | null = null;
 
 	private peerConnection: RTCPeerConnection | null = null;
 
-	private readonly serverUrl: string;
+	private initPromise: Promise<void> | null = null;
+
+	private audioContext: AudioContext | null = null;
+
+	private outgoingGainNode: GainNode | null = null;
+
+	private readonly webSocketUrl: string;
+
+	private readonly httpBaseUrl: string;
 
 	localStream: MediaStream | undefined;
+
+	localOutgoingStream: MediaStream | undefined;
 
 	remoteStream: MediaStream | undefined;
 
@@ -25,73 +45,197 @@ export class WebrtcViewModel extends EventTarget {
 	constructor(serverUrl: string) {
 		super();
 
-		this.serverUrl = serverUrl;
+		this.webSocketUrl = this.buildWebSocketUrl(serverUrl);
+		this.httpBaseUrl = this.buildHttpBaseUrl(serverUrl);
+	}
+
+	private buildWebSocketUrl(url: string) {
+		try {
+			const parsed = new URL(url);
+
+			if (parsed.protocol === 'http:') {
+				parsed.protocol = 'ws:';
+			}
+
+			if (parsed.protocol === 'https:') {
+				parsed.protocol = 'wss:';
+			}
+
+			return parsed.toString();
+		} catch {
+			return url;
+		}
+	}
+
+	private buildHttpBaseUrl(url: string) {
+		try {
+			const parsed = new URL(url);
+
+			if (parsed.protocol === 'ws:') {
+				parsed.protocol = 'http:';
+			}
+
+			if (parsed.protocol === 'wss:') {
+				parsed.protocol = 'https:';
+			}
+
+			return parsed.origin;
+		} catch {
+			return url;
+		}
+	}
+
+	async getRoomState(): Promise<TRoomState> {
+		const roomStateUrl = new URL('/room-state', this.httpBaseUrl).toString();
+		const response = await fetch(roomStateUrl, { cache: 'no-store' });
+
+		if (!response.ok) {
+			throw new Error(`Failed to fetch room state: ${response.status}`);
+		}
+
+		const data = (await response.json()) as Partial<TRoomState>;
+
+		return {
+			participants: typeof data.participants === 'number' ? data.participants : 0,
+			capacity: typeof data.capacity === 'number' ? data.capacity : 2,
+		};
 	}
 
 	async init() {
-		/**
-		 * WebSocket
-		 */
-		this.webSocket = new WebSocket(this.serverUrl);
+		if (this.webSocket?.readyState === WebSocket.OPEN) {
+			return;
+		}
 
-		this.webSocket?.addEventListener('message', async (event) => {
-			const data: TSignalMessage = JSON.parse(event.data);
+		if (this.initPromise) {
+			await this.initPromise;
 
-			// @todo Debug
-			try {
-				/**
-				 * Сервер просит сформировать офер
-				 */
-				if (data.type === 'startOffer') {
-					await this.startOffer();
-				}
+			return;
+		}
 
-				/**
-				 * Тут я получаю предложение от другого участника соединиться
-				 */
-				if (data.type === 'offer') {
-					// создаём peerConnection только если ещё не было
-					if (!this.peerConnection) {
-						this.peerConnection = new RTCPeerConnection({
-							iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
-							// iceTransportPolicy: 'all',
-						});
+		this.initPromise = new Promise<void>((resolve, reject) => {
+			const socket = new WebSocket(this.webSocketUrl);
+			this.webSocket = socket;
 
-						this.setupPeerConnectionEvents();
+			socket.addEventListener('message', async (event) => {
+				const data: TSignalMessage = JSON.parse(event.data);
+
+				// @todo Debug
+				try {
+					if (data.type === 'roomState') {
+						this.dispatchEvent(
+							new CustomEvent<TRoomState>('roomState', {
+								detail: { participants: data.participants, capacity: data.capacity },
+							}),
+						);
+
+						return;
 					}
 
-					// ✅ Создаём локальный поток заранее
-					if (!this.localStream) {
-						await this.createLocalStream();
+					if (data.type === 'roomFull') {
+						this.dispatchEvent(new CustomEvent('roomFull', { detail: data.message ?? 'Room is full' }));
+
+						return;
 					}
 
-					await this.peerConnection.setRemoteDescription(data.offer);
+					if (data.type === 'status') {
+						this.dispatchEvent(new CustomEvent('status', { detail: data.message }));
 
-					const answer = await this.peerConnection.createAnswer();
-					await this.peerConnection.setLocalDescription(answer);
+						return;
+					}
 
-					console.log('ANSWER SDP:', this.peerConnection?.localDescription?.sdp);
+					if (data.type === 'error') {
+						this.dispatchEvent(new CustomEvent('error', { detail: data.message ?? 'Signaling server error' }));
 
-					this.webSocket?.send(JSON.stringify({ type: 'answer', answer }));
+						return;
+					}
+
+					if (data.type === 'hangup') {
+						this.endCall({ notifyRemote: false });
+						this.destroy();
+
+						return;
+					}
+
+					/**
+					 * Сервер просит сформировать офер
+					 */
+					if (data.type === 'startOffer') {
+						await this.startOffer();
+					}
+
+					/**
+					 * Тут я получаю предложение от другого участника соединиться
+					 */
+					if (data.type === 'offer') {
+						// создаём peerConnection только если ещё не было
+						if (!this.peerConnection) {
+							this.peerConnection = new RTCPeerConnection({
+								iceServers: [STUN_SERVERS, ...(IS_TURN_SERVERS_USED ? [TURN_SERVERS] : [])],
+								// iceTransportPolicy: 'all',
+							});
+
+							this.setupPeerConnectionEvents();
+						}
+
+						// ✅ Создаём локальный поток заранее
+						if (!this.localStream) {
+							await this.createLocalStream();
+						}
+
+						await this.peerConnection.setRemoteDescription(data.offer);
+
+						const answer = await this.peerConnection.createAnswer();
+						await this.peerConnection.setLocalDescription(answer);
+
+						console.log('ANSWER SDP:', this.peerConnection?.localDescription?.sdp);
+
+						this.webSocket?.send(JSON.stringify({ type: 'answer', answer }));
+					}
+
+					/**
+					 * Тут я отправляю ответ на приглашение присоединиться
+					 */
+					if (data.type === 'answer') {
+						await this.peerConnection?.setRemoteDescription(data.answer);
+					}
+
+					/**
+					 * Тут я ?
+					 */
+					if (data.type === 'candidate') {
+						await this.peerConnection?.addIceCandidate(data.candidate);
+					}
+				} catch (error) {
+					this.dispatchEvent(new CustomEvent('error', { detail: error }));
 				}
+			});
 
-				/**
-				 * Тут я отправляю ответ на приглашение присоединиться
-				 */
-				if (data.type === 'answer') {
-					await this.peerConnection?.setRemoteDescription(data.answer);
-				}
+			const onOpen = () => {
+				resolve();
+			};
 
-				/**
-				 * Тут я ?
-				 */
-				if (data.type === 'candidate') {
-					await this.peerConnection?.addIceCandidate(data.candidate);
+			const onError = (event: Event) => {
+				reject(event);
+			};
+
+			socket.addEventListener('open', onOpen, { once: true });
+			socket.addEventListener('error', onError, { once: true });
+			socket.addEventListener('close', () => {
+				if (this.webSocket === socket) {
+					this.webSocket = null;
 				}
-			} catch (error) {
-				this.dispatchEvent(new CustomEvent('error', { detail: error }));
-			}
+			});
 		});
+
+		try {
+			await this.initPromise;
+		} catch (error) {
+			this.webSocket?.close();
+			this.webSocket = null;
+			throw error;
+		} finally {
+			this.initPromise = null;
+		}
 	}
 
 	private setupPeerConnectionEvents() {
@@ -133,7 +277,11 @@ export class WebrtcViewModel extends EventTarget {
 	}
 
 	async startCall() {
-		if (!this.webSocket) {
+		if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
+			await this.init();
+		}
+
+		if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
 			throw new Error('Connection to signaling server is not initialized');
 		}
 
@@ -178,16 +326,37 @@ export class WebrtcViewModel extends EventTarget {
 		this.webSocket?.send(JSON.stringify({ type: 'offer', offer }));
 	}
 
-	endCall() {
+	endCall(options?: { notifyRemote?: boolean }) {
+		const notifyRemote = options?.notifyRemote ?? true;
+
 		console.log('endCall');
 
 		if (typeof window !== 'undefined') {
 			window.clearInterval(this.logIntervalMs);
 		}
 
+		const stoppedTrackIds = new Set<string>();
+		const stopStreamTracks = (stream?: MediaStream) => {
+			stream?.getTracks().forEach((track) => {
+				if (stoppedTrackIds.has(track.id)) {
+					return;
+				}
+
+				track.stop();
+				stoppedTrackIds.add(track.id);
+			});
+		};
+
 		// 1. Остановить локальные треки
-		// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-		this.localStream?.getTracks().forEach((track) => track.stop());
+		stopStreamTracks(this.localOutgoingStream);
+		stopStreamTracks(this.localStream);
+
+		if (this.audioContext) {
+			void this.audioContext.close();
+			this.audioContext = null;
+		}
+
+		this.outgoingGainNode = null;
 
 		// 2. Закрыть соединение
 		if (this.peerConnection) {
@@ -198,10 +367,13 @@ export class WebrtcViewModel extends EventTarget {
 		}
 
 		this.localStream = undefined;
+		this.localOutgoingStream = undefined;
 		this.remoteStream = undefined;
 
 		// 3. Сообщить удалённой стороне
-		this.webSocket?.send(JSON.stringify({ type: 'hangup' }));
+		if (notifyRemote && this.webSocket?.readyState === WebSocket.OPEN) {
+			this.webSocket.send(JSON.stringify({ type: 'hangup' }));
+		}
 
 		this.dispatchEvent(new CustomEvent('endCall'));
 	}
@@ -211,37 +383,95 @@ export class WebrtcViewModel extends EventTarget {
 		 * This works only with HTTPS
 		 */
 		// @todo Обработать ошибки при запросе user media
-		this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+		this.localStream = await navigator.mediaDevices.getUserMedia({
+			video: true,
+			audio: {
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: true,
+				channelCount: 1,
+			},
+		});
 
 		navigator.mediaDevices.enumerateDevices().then((devices) => {
 			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
 			devices.forEach((d) => console.log(`Media devices - ${d.kind}: ${d.label} id=${d.deviceId}`));
 		});
 
-		this.localStream.getAudioTracks()[0].onmute = () => console.warn('local track muted');
+		const [localAudioTrack] = this.localStream.getAudioTracks();
+		const localVideoTracks = this.localStream.getVideoTracks();
 
-		this.localStream.getAudioTracks()[0].onunmute = () => console.warn('local track unmuted');
+		if (localAudioTrack) {
+			localAudioTrack.onmute = () => console.warn('local track muted');
+			localAudioTrack.onunmute = () => console.warn('local track unmuted');
+		}
 
-		const stream = this.localStream;
+		const outgoingStream = new MediaStream(localVideoTracks);
 
-		// Включаем все аудио и видео треки перед добавлением
-		stream.getTracks().forEach((track) => {
+		if (localAudioTrack) {
+			const boostedAudioTrack = this.createBoostedAudioTrack(this.localStream, localAudioTrack);
+			outgoingStream.addTrack(boostedAudioTrack);
+		}
+
+		this.localOutgoingStream = outgoingStream;
+
+		// Включаем все аудио и видео треки перед добавлением.
+		outgoingStream.getTracks().forEach((track) => {
 			track.enabled = true; // включаем трек
-			this.peerConnection?.addTrack(track, stream);
+			this.peerConnection?.addTrack(track, outgoingStream);
 		});
 
 		console.log('[Local stream] audio tracks ->', this.localStream.getAudioTracks());
 
 		console.log(
 			'[Local stream] all tracks ->',
-			stream
+			outgoingStream
 				.getTracks()
 				.map((track) => ({ kind: track.kind, readyState: track.readyState, enabled: track.enabled })),
 		);
 
 		console.log('Track transmitters ->', this.peerConnection?.getSenders());
 
-		this.dispatchEvent(new CustomEvent('localStream', { detail: stream }));
+		this.dispatchEvent(new CustomEvent('localStream', { detail: this.localStream }));
+	}
+
+	private createBoostedAudioTrack(sourceStream: MediaStream, fallbackTrack: MediaStreamTrack) {
+		try {
+			const AudioContextCtor =
+				window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+			if (!AudioContextCtor) {
+				return fallbackTrack;
+			}
+
+			this.audioContext = new AudioContextCtor();
+			const sourceNode = this.audioContext.createMediaStreamSource(sourceStream);
+			const destinationNode = this.audioContext.createMediaStreamDestination();
+
+			this.outgoingGainNode = this.audioContext.createGain();
+			this.outgoingGainNode.gain.value = 1.8;
+
+			sourceNode.connect(this.outgoingGainNode);
+			this.outgoingGainNode.connect(destinationNode);
+
+			if (this.audioContext.state === 'suspended') {
+				void this.audioContext.resume();
+			}
+
+			const boostedAudioTrack = destinationNode.stream.getAudioTracks()[0];
+
+			if (!boostedAudioTrack) {
+				return fallbackTrack;
+			}
+
+			boostedAudioTrack.contentHint = 'speech';
+
+			return boostedAudioTrack;
+		} catch (error) {
+			console.warn('Failed to create boosted outgoing track, fallback to raw microphone track', error);
+
+			return fallbackTrack;
+		}
 	}
 
 	cleanUp() {
@@ -256,8 +486,11 @@ export class WebrtcViewModel extends EventTarget {
 		console.log('destroy');
 
 		this.peerConnection?.close();
+		this.peerConnection = null;
 
 		this.webSocket?.close();
+		this.webSocket = null;
+		this.initPromise = null;
 	}
 
 	logStats(peerConnection: RTCPeerConnection) {
