@@ -88,17 +88,14 @@ export default function Page() {
 		}
 	}, []);
 
-	const onRoomState = useCallback(
-		(event: Event) => {
-			const nextRoomState = (event as CustomEvent<TRoomState>).detail;
-			setRoomState(nextRoomState);
+	const onRoomState = useCallback((event: Event) => {
+		const nextRoomState = (event as CustomEvent<TRoomState>).detail;
+		setRoomState(nextRoomState);
 
-			if (isRoomJoined && nextRoomState.participants < 2) {
-				setHasRemoteParticipant(false);
-			}
-		},
-		[isRoomJoined],
-	);
+		if (nextRoomState.participants < 2) {
+			setHasRemoteParticipant(false);
+		}
+	}, []);
 
 	const onRoomFull = useCallback((event: Event) => {
 		const reason = (event as CustomEvent<string>).detail ?? 'Комната уже заполнена';
@@ -238,9 +235,14 @@ export default function Page() {
 			viewModel.removeEventListener('roomFull', onRoomFull);
 			viewModel.removeEventListener('error', onError);
 			viewModel.removeEventListener('endCall', onCallEnd);
-			viewModel.cleanUp();
 		};
 	}, [viewModel, onLocalStream, onRemoteStream, onConnectionStateChange, onRoomState, onRoomFull, onError, onCallEnd]);
+
+	useEffect(() => {
+		return () => {
+			viewModel.cleanUp();
+		};
+	}, [viewModel]);
 
 	return (
 		<main className={styles.page}>

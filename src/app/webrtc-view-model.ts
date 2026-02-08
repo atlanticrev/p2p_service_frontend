@@ -19,6 +19,12 @@ export type TRoomState = {
 	capacity: number;
 };
 
+type TLegacyGetUserMedia = (
+	constraints: MediaStreamConstraints,
+	successCallback: (stream: MediaStream) => void,
+	errorCallback: (error: DOMException) => void,
+) => void;
+
 export class WebrtcViewModel extends EventTarget {
 	private webSocket: WebSocket | null = null;
 
@@ -99,6 +105,30 @@ export class WebrtcViewModel extends EventTarget {
 			participants: typeof data.participants === 'number' ? data.participants : 0,
 			capacity: typeof data.capacity === 'number' ? data.capacity : 2,
 		};
+	}
+
+	private async requestUserMedia(constraints: MediaStreamConstraints) {
+		if (navigator.mediaDevices?.getUserMedia) {
+			return navigator.mediaDevices.getUserMedia(constraints);
+		}
+
+		const legacyNavigator = navigator as Navigator & {
+			getUserMedia?: TLegacyGetUserMedia;
+			webkitGetUserMedia?: TLegacyGetUserMedia;
+			mozGetUserMedia?: TLegacyGetUserMedia;
+		};
+
+		const legacyGetUserMedia =
+			legacyNavigator.getUserMedia || legacyNavigator.webkitGetUserMedia || legacyNavigator.mozGetUserMedia;
+
+		if (legacyGetUserMedia) {
+			return new Promise<MediaStream>((resolve, reject) => {
+				legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+			});
+		}
+
+		const secureContextInfo = typeof window !== 'undefined' ? `secure=${String(window.isSecureContext)} protocol=${window.location.protocol}` : 'secure=unknown';
+		throw new Error(`getUserMedia is unavailable in this browser/context (${secureContextInfo})`);
 	}
 
 	async init() {
@@ -383,7 +413,7 @@ export class WebrtcViewModel extends EventTarget {
 		 * This works only with HTTPS
 		 */
 		// @todo Обработать ошибки при запросе user media
-		this.localStream = await navigator.mediaDevices.getUserMedia({
+		this.localStream = await this.requestUserMedia({
 			video: true,
 			audio: {
 				echoCancellation: true,
@@ -393,10 +423,12 @@ export class WebrtcViewModel extends EventTarget {
 			},
 		});
 
-		navigator.mediaDevices.enumerateDevices().then((devices) => {
-			// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
-			devices.forEach((d) => console.log(`Media devices - ${d.kind}: ${d.label} id=${d.deviceId}`));
-		});
+		if (navigator.mediaDevices?.enumerateDevices) {
+			navigator.mediaDevices.enumerateDevices().then((devices) => {
+				// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
+				devices.forEach((d) => console.log(`Media devices - ${d.kind}: ${d.label} id=${d.deviceId}`));
+			});
+		}
 
 		const [localAudioTrack] = this.localStream.getAudioTracks();
 		const localVideoTracks = this.localStream.getVideoTracks();
