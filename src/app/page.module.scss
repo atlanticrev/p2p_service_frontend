@@ -257,10 +257,56 @@
   z-index: 8;
 }
 
+.callActionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(12, 36, 52, 0.9), rgba(9, 26, 39, 0.86));
+  border: 1px solid rgba(152, 207, 239, 0.24);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.callControlButton {
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: #dff2ff;
+  background: rgba(24, 58, 82, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(31, 72, 101, 0.95);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.callControlButtonOff {
+  background: rgba(216, 84, 70, 0.94);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: rgba(200, 70, 58, 0.96);
+  }
+}
+
 .callExitButton {
   border: none;
   border-radius: 999px;
-  min-width: min(88vw, 280px);
+  min-width: 0;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
   font-weight: 600;
@@ -333,8 +379,11 @@
     padding: 0 0.6rem;
   }
 
+  .callActionGroup {
+    width: min(100%, 520px);
+  }
+
   .callExitButton {
-    min-width: calc(100vw - 1.2rem);
-    max-width: 520px;
+    flex: 1 1 auto;
   }
 }

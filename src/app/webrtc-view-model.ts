@@ -42,6 +42,10 @@ const HIGH_QUALITY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 };
 
 export class WebrtcViewModel extends EventTarget {
+	private readonly defaultMicrophoneEnabled = true;
+
+	private readonly defaultCameraEnabled = false;
+
 	private webSocket: WebSocket | null = null;
 
 	private peerConnection: RTCPeerConnection | null = null;
@@ -404,6 +408,69 @@ export class WebrtcViewModel extends EventTarget {
 		this.webSocket?.send(JSON.stringify({ type: 'offer', offer }));
 	}
 
+	private getPrimaryTrackEnabled(kind: 'audio' | 'video') {
+		if (kind === 'audio') {
+			return this.localOutgoingStream?.getAudioTracks()[0]?.enabled ?? this.localStream?.getAudioTracks()[0]?.enabled ?? null;
+		}
+
+		return this.localStream?.getVideoTracks()[0]?.enabled ?? this.localOutgoingStream?.getVideoTracks()[0]?.enabled ?? null;
+	}
+
+	private setTrackEnabled(kind: 'audio' | 'video', enabled: boolean) {
+		const targetStreams = [this.localStream, this.localOutgoingStream];
+
+		let hasTrack = false;
+		const processedTrackIds = new Set<string>();
+
+		targetStreams.forEach((stream) => {
+			const tracks = kind === 'audio' ? stream?.getAudioTracks() : stream?.getVideoTracks();
+
+			tracks?.forEach((track) => {
+				if (processedTrackIds.has(track.id)) {
+					return;
+				}
+
+				track.enabled = enabled;
+				processedTrackIds.add(track.id);
+				hasTrack = true;
+			});
+		});
+
+		return hasTrack;
+	}
+
+	isMicrophoneEnabled() {
+		return this.getPrimaryTrackEnabled('audio');
+	}
+
+	isCameraEnabled() {
+		return this.getPrimaryTrackEnabled('video');
+	}
+
+	setMicrophoneEnabled(enabled: boolean) {
+		const hasTrack = this.setTrackEnabled('audio', enabled);
+
+		return hasTrack ? (this.isMicrophoneEnabled() ?? enabled) : null;
+	}
+
+	setCameraEnabled(enabled: boolean) {
+		const hasTrack = this.setTrackEnabled('video', enabled);
+
+		return hasTrack ? (this.isCameraEnabled() ?? enabled) : null;
+	}
+
+	toggleMicrophone() {
+		const nextEnabled = !(this.isMicrophoneEnabled() ?? true);
+
+		return this.setMicrophoneEnabled(nextEnabled);
+	}
+
+	toggleCamera() {
+		const nextEnabled = !(this.isCameraEnabled() ?? true);
+
+		return this.setCameraEnabled(nextEnabled);
+	}
+
 	endCall(options?: { notifyRemote?: boolean }) {
 		const notifyRemote = options?.notifyRemote ?? true;
 
@@ -478,9 +545,11 @@ export class WebrtcViewModel extends EventTarget {
 
 		localVideoTracks.forEach((track) => {
 			track.contentHint = 'detail';
+			track.enabled = this.defaultCameraEnabled;
 		});
 
 		if (localAudioTrack) {
+			localAudioTrack.enabled = this.defaultMicrophoneEnabled;
 			localAudioTrack.onmute = () => console.warn('local track muted');
 			localAudioTrack.onunmute = () => console.warn('local track unmuted');
 		}
@@ -489,14 +558,15 @@ export class WebrtcViewModel extends EventTarget {
 
 		if (localAudioTrack) {
 			const boostedAudioTrack = this.createBoostedAudioTrack(this.localStream, localAudioTrack);
+			boostedAudioTrack.enabled = this.defaultMicrophoneEnabled;
 			outgoingStream.addTrack(boostedAudioTrack);
 		}
 
 		this.localOutgoingStream = outgoingStream;
 
-		// Включаем все аудио и видео треки перед добавлением.
+		// Применяем дефолтные состояния треков (mic on / cam off) перед добавлением.
 		outgoingStream.getTracks().forEach((track) => {
-			track.enabled = true; // включаем трек
+			track.enabled = track.kind === 'audio' ? this.defaultMicrophoneEnabled : this.defaultCameraEnabled;
 			this.peerConnection?.addTrack(track, outgoingStream);
 		});
 

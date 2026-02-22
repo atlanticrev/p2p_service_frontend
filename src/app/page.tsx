@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PhoneCall, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff } from 'lucide-react';
 
 import { SERVER_URL } from '@/src/app/config';
 
@@ -18,6 +18,9 @@ export default function Page() {
 	const [isJoining, setIsJoining] = useState(false);
 	const [isRoomJoined, setIsRoomJoined] = useState(false);
 	const [hasRemoteParticipant, setHasRemoteParticipant] = useState(false);
+	const [isLocalMediaReady, setIsLocalMediaReady] = useState(false);
+	const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(true);
+	const [isCameraEnabled, setIsCameraEnabled] = useState(false);
 	const [roomState, setRoomState] = useState<TRoomState>(DEFAULT_ROOM_STATE);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const roomTitle = 'Room #1';
@@ -36,24 +39,30 @@ export default function Page() {
 		}
 	}, [viewModel]);
 
-	const onLocalStream = useCallback((event: Event) => {
-		const stream = (event as CustomEvent<MediaStream>).detail;
+	const onLocalStream = useCallback(
+		(event: Event) => {
+			const stream = (event as CustomEvent<MediaStream>).detail;
+			setIsLocalMediaReady(true);
+			setIsMicrophoneEnabled(viewModel.isMicrophoneEnabled() ?? true);
+			setIsCameraEnabled(viewModel.isCameraEnabled() ?? true);
 
-		if (localVideoRef.current) {
-			localVideoRef.current.srcObject = stream;
-			localVideoRef.current.muted = true;
-			localVideoRef.current.volume = 1.0;
+			if (localVideoRef.current) {
+				localVideoRef.current.srcObject = stream;
+				localVideoRef.current.muted = true;
+				localVideoRef.current.volume = 1.0;
 
-			localVideoRef.current
-				.play()
-				.then(() => {
-					console.log('Local video started playing...');
-				})
-				.catch((err) => {
-					console.warn('Local video autoplay was prevented:', err);
-				});
-		}
-	}, []);
+				localVideoRef.current
+					.play()
+					.then(() => {
+						console.log('Local video started playing...');
+					})
+					.catch((err) => {
+						console.warn('Local video autoplay was prevented:', err);
+					});
+			}
+		},
+		[viewModel],
+	);
 
 	const onRemoteStream = useCallback((event: Event) => {
 		const remoteStream = (event as CustomEvent<MediaStream>).detail;
@@ -117,6 +126,9 @@ export default function Page() {
 			setIsJoining(false);
 			setIsRoomJoined(false);
 			setHasRemoteParticipant(false);
+			setIsLocalMediaReady(false);
+			setIsMicrophoneEnabled(true);
+			setIsCameraEnabled(false);
 
 			if (localVideoRef.current?.srcObject) {
 				// biome-ignore lint/suspicious/useIterableCallbackReturn: <->
@@ -168,9 +180,28 @@ export default function Page() {
 		setErrorMessage(null);
 		setIsRoomJoined(false);
 		setHasRemoteParticipant(false);
+		setIsLocalMediaReady(false);
+		setIsMicrophoneEnabled(true);
+		setIsCameraEnabled(false);
 		viewModel.cleanUp();
 		void refreshRoomState();
 	}, [viewModel, refreshRoomState]);
+
+	const toggleMicrophone = useCallback(() => {
+		const nextState = viewModel.toggleMicrophone();
+
+		if (typeof nextState === 'boolean') {
+			setIsMicrophoneEnabled(nextState);
+		}
+	}, [viewModel]);
+
+	const toggleCamera = useCallback(() => {
+		const nextState = viewModel.toggleCamera();
+
+		if (typeof nextState === 'boolean') {
+			setIsCameraEnabled(nextState);
+		}
+	}, [viewModel]);
 
 	const statusLabel = (() => {
 		if (status === 'room-full') {
@@ -264,10 +295,36 @@ export default function Page() {
 						<video ref={localVideoRef} muted={true} playsInline autoPlay className={styles.localVideo} />
 
 						<div className={styles.callActions}>
-							<button type="button" onClick={endCall} className={styles.callExitButton}>
-								<PhoneOff size={18} />
-								Выйти
-							</button>
+							<div className={styles.callActionGroup}>
+								<button
+									type="button"
+									onClick={toggleMicrophone}
+									className={`${styles.callControlButton} ${!isMicrophoneEnabled ? styles.callControlButtonOff : ''}`}
+									disabled={!isLocalMediaReady}
+									aria-pressed={!isMicrophoneEnabled}
+									aria-label={isMicrophoneEnabled ? 'Выключить микрофон' : 'Включить микрофон'}
+									title={isMicrophoneEnabled ? 'Выключить микрофон' : 'Включить микрофон'}
+								>
+									{isMicrophoneEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+								</button>
+
+								<button
+									type="button"
+									onClick={toggleCamera}
+									className={`${styles.callControlButton} ${!isCameraEnabled ? styles.callControlButtonOff : ''}`}
+									disabled={!isLocalMediaReady}
+									aria-pressed={!isCameraEnabled}
+									aria-label={isCameraEnabled ? 'Выключить камеру' : 'Включить камеру'}
+									title={isCameraEnabled ? 'Выключить камеру' : 'Включить камеру'}
+								>
+									{isCameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
+								</button>
+
+								<button type="button" onClick={endCall} className={styles.callExitButton} aria-label="Выйти из звонка">
+									<PhoneOff size={18} />
+									Выйти
+								</button>
+							</div>
 						</div>
 					</section>
 				</section>
