@@ -1,0 +1,36 @@
+.page {
+	--surface: #081925;
+	--surface-soft: #10283a;
+	--surface-elevated: #16374e;
+	--text: #eef8ff;
+	--muted: #9fc0d8;
+	--accent: #2dd4bf;
+	--accent-hover: #16b9a5;
+	--danger: #f97362;
+	--danger-hover: #e85c49;
+
+	min-height: 100svh;
+	width: 100%;
+	display: grid;
+	color: var(--text);
+	background:
+		radial-gradient(circle at 12% 20%, #1f4f71 0%, transparent 34%),
+		radial-gradient(circle at 85% 18%, #17435f 0%, transparent 42%),
+		linear-gradient(145deg, #04111a 0%, #071824 48%, #0a1f2d 100%);
+}
+
+.pageLobby {
+	place-items: center;
+	padding: 1.25rem;
+}
+
+.pageCall {
+	place-items: stretch;
+	padding: 0;
+}
+
+@media (max-width: 700px) {
+	.pageLobby {
+		padding: 1rem;
+	}
+}

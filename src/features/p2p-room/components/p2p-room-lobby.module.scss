@@ -1,0 +1,127 @@
+.card {
+	width: min(100%, 680px);
+	padding: 1.25rem;
+	border-radius: 22px;
+	border: 1px solid rgba(166, 213, 242, 0.24);
+	background: linear-gradient(165deg, rgba(17, 43, 61, 0.92), rgba(11, 30, 43, 0.95));
+	box-shadow: 0 14px 45px rgba(0, 0, 0, 0.45);
+	backdrop-filter: blur(10px);
+}
+
+.header {
+	display: flex;
+	flex-flow: column nowrap;
+	gap: 0.35rem;
+}
+
+.roomLabel {
+	margin: 0;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	font-size: 0.76rem;
+	color: var(--muted);
+}
+
+.roomTitle {
+	margin: 0;
+	font-size: clamp(1.3rem, 3.5vw, 1.8rem);
+	font-weight: 650;
+}
+
+.roomHint {
+	margin: 0.8rem 0 0;
+	font-size: 0.95rem;
+	line-height: 1.4;
+	color: #cae7ff;
+}
+
+.peopleList {
+	margin-top: 1rem;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.personCard {
+	padding: 0.85rem;
+	border-radius: 14px;
+	background: linear-gradient(180deg, rgba(21, 55, 77, 0.9), rgba(16, 41, 59, 0.9));
+	border: 1px solid rgba(124, 182, 221, 0.2);
+}
+
+.personName {
+	margin: 0;
+	font-size: 0.86rem;
+	font-weight: 600;
+	color: #dff2ff;
+}
+
+.personState {
+	margin: 0.35rem 0 0;
+	font-size: 0.95rem;
+	color: #9dd5f3;
+}
+
+.controls {
+	margin-top: 1rem;
+	display: flex;
+	flex-flow: column nowrap;
+	gap: 0.6rem;
+}
+
+%buttonBase {
+	width: 100%;
+	border: none;
+	border-radius: 12px;
+	padding: 0.8rem 1rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	transition: transform 0.16s ease, background-color 0.18s ease;
+
+	&:disabled {
+		opacity: 0.7;
+		cursor: wait;
+	}
+
+	&:hover:not(:disabled) {
+		transform: translateY(-1px);
+	}
+}
+
+.startCallButton {
+	@extend %buttonBase;
+	background: var(--accent);
+	color: #03231f;
+
+	&:hover:not(:disabled) {
+		background: var(--accent-hover);
+	}
+}
+
+.status {
+	margin: 0;
+	font-size: 0.9rem;
+	color: #bedef2;
+}
+
+.error {
+	margin: 0;
+	font-size: 0.88rem;
+	color: #ffb2a9;
+}
+
+@media (max-width: 700px) {
+	.card {
+		padding: 1rem;
+		border-radius: 16px;
+	}
+
+	.peopleList {
+		grid-template-columns: 1fr;
+	}
+}
